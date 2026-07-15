@@ -50,7 +50,15 @@ export const BidModal: React.FC<BidModalProps> = ({ territory, wallet, onConfirm
                     </div>
                 </div>
 
+
+                {red === 0 && blue === 0 && (
+                    <div className="text-red-500 text-sm font-bold text-center mb-2 animate-pulse">
+                        出价不能为 0！请至少投入一个代币。
+                    </div>
+                )}
+
                 <div className="text-xs text-gray-500 text-center mb-6">
+
                     提示：若攻占失败，投入资源将安全退回库中。
                 </div>
              </>
