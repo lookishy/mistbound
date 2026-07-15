@@ -1,15 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #aa3bff;
-  --color-secondary: #c084fc;
-  --color-dark: #16171d;
-  --color-light: #f3f4f6;
+  --color-primary: #8B5A2B;
+  --color-secondary: #5C4033;
+  --color-dark: #1A1814;
+  --color-light: #E8E0D5;
+  --color-danger: #8B0000;
 }
 
 body {
   background-color: var(--color-dark);
   color: var(--color-light);
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  overflow: hidden; /* Prevent scrolling for app feel */
+}
+
+/* Base styling for earth-toned battlefield feel */
+.earth-bg {
+  background: linear-gradient(to bottom, #2C241B, #1A1814);
+}
+
+.earth-border {
+  border-color: #5C4033;
+}
+
+.earth-panel {
+  background-color: rgba(44, 36, 27, 0.85);
+  border: 1px solid #5C4033;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
 }
