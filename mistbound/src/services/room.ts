@@ -4,23 +4,39 @@ import type { Room, GameState, Player, Territory } from '../types/game';
 
 const generateRoomId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
-// Default Map Generation (Static Topology with Chinese Names)
+
+// Expanded Map Generation (18 nodes + start + end)
 const generateInitialMap = () => {
   const nodes = [
-    { id: 'start', name: '大本营(起)', baseValue: 0 }, // no price
-    { id: 'path1_a', name: '蛮荒之地', baseValue: 10 },
-    { id: 'path1_b', name: '绿野仙踪', baseValue: 12 },
-    { id: 'path2_a', name: '风暴峭壁', baseValue: 10 },
-    { id: 'hub_mid', name: '中立要塞', baseValue: 20 },
-    { id: 'path3_a', name: '烈焰峡谷', baseValue: 15 },
-    { id: 'path3_b', name: '迷雾旷野', baseValue: 15 },
-    { id: 'hub_central', name: '中央枢纽', baseValue: 25 },
-    { id: 'path4_a', name: '冰封雪域', baseValue: 12 },
-    { id: 'path5_a', name: '幽暗密林', baseValue: 10 },
-    { id: 'path5_b', name: '死亡沼泽', baseValue: 12 },
-    { id: 'path6_a', name: '哀嚎深渊', baseValue: 10 },
-    { id: 'hub_late', name: '决战高地', baseValue: 20 },
-    { id: 'end', name: '敌军之冠(终)', baseValue: 0 } // no price
+    { id: 'start', name: '大本营(起)', baseValue: 0 },
+
+    // Front Line
+    { id: 'node_f1', name: '破晓营地', baseValue: 8 },
+    { id: 'node_f2', name: '迷雾裂谷', baseValue: 10 },
+    { id: 'node_f3', name: '前哨堡垒', baseValue: 8 },
+    { id: 'node_f4', name: '风暴之眼', baseValue: 12 },
+
+    // Mid Line 1
+    { id: 'node_m1', name: '铁血长廊', baseValue: 15 },
+    { id: 'node_m2', name: '暗影沼泽', baseValue: 12 },
+    { id: 'node_m3', name: '中枢要塞', baseValue: 20 },
+    { id: 'node_m4', name: '烈焰深渊', baseValue: 15 },
+    { id: 'node_m5', name: '荆棘岭', baseValue: 10 },
+
+    // Mid Line 2
+    { id: 'node_m6', name: '龙骨荒野', baseValue: 18 },
+    { id: 'node_m7', name: '水晶矿脉', baseValue: 15 },
+    { id: 'node_m8', name: '静默之地', baseValue: 12 },
+    { id: 'node_m9', name: '雷霆巅峰', baseValue: 18 },
+
+    // Back Line
+    { id: 'node_b1', name: '血月祭坛', baseValue: 22 },
+    { id: 'node_b2', name: '绝对防线', baseValue: 25 },
+    { id: 'node_b3', name: '永冻冰川', baseValue: 20 },
+    { id: 'node_b4', name: '虚空裂隙', baseValue: 22 },
+    { id: 'node_b5', name: '末日守望', baseValue: 18 },
+
+    { id: 'end', name: '敌军之冠(终)', baseValue: 0 }
   ];
 
   const territories: Record<string, Territory> = {};

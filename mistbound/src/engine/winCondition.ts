@@ -1,21 +1,34 @@
 import type { GameState, NodeId, PlayerId } from '../types/game';
 
 // Define the static graph connections (adjacency list) matching the new complex edges
+
+// Expanded Graph Topology
 export const mapGraph: Record<NodeId, NodeId[]> = {
-  'start': ['path1_a', 'path2_a', 'path3_a'],
-  'path1_a': ['start', 'path1_b'],
-  'path1_b': ['path1_a', 'hub_mid', 'path4_a'],
-  'path2_a': ['start', 'hub_mid', 'path3_b'],
-  'path3_a': ['start', 'path3_b'],
-  'path3_b': ['path3_a', 'path2_a', 'hub_central'],
-  'hub_mid': ['path1_b', 'path2_a', 'path4_a', 'path5_a', 'hub_central'],
-  'path4_a': ['path1_b', 'hub_mid', 'hub_late', 'path5_b'],
-  'path5_a': ['hub_mid', 'path5_b'],
-  'path5_b': ['path4_a', 'path5_a', 'path6_a', 'hub_late'],
-  'hub_central': ['path3_b', 'hub_mid', 'path6_a'],
-  'path6_a': ['hub_central', 'path5_b', 'hub_late'],
-  'hub_late': ['path4_a', 'path5_b', 'path6_a', 'end'],
-  'end': ['hub_late']
+  'start': ['node_f1', 'node_f2', 'node_f3', 'node_f4'],
+
+  'node_f1': ['start', 'node_f2', 'node_m1', 'node_m2'],
+  'node_f2': ['start', 'node_f1', 'node_f3', 'node_m2', 'node_m3'],
+  'node_f3': ['start', 'node_f2', 'node_f4', 'node_m3', 'node_m4'],
+  'node_f4': ['start', 'node_f3', 'node_m4', 'node_m5'],
+
+  'node_m1': ['node_f1', 'node_m2', 'node_m6'],
+  'node_m2': ['node_f1', 'node_f2', 'node_m1', 'node_m3', 'node_m6', 'node_m7'],
+  'node_m3': ['node_f2', 'node_f3', 'node_m2', 'node_m4', 'node_m7', 'node_m8'],
+  'node_m4': ['node_f3', 'node_f4', 'node_m3', 'node_m5', 'node_m8', 'node_m9'],
+  'node_m5': ['node_f4', 'node_m4', 'node_m9'],
+
+  'node_m6': ['node_m1', 'node_m2', 'node_m7', 'node_b1', 'node_b2'],
+  'node_m7': ['node_m2', 'node_m3', 'node_m6', 'node_m8', 'node_b2', 'node_b3'],
+  'node_m8': ['node_m3', 'node_m4', 'node_m7', 'node_m9', 'node_b3', 'node_b4'],
+  'node_m9': ['node_m4', 'node_m5', 'node_m8', 'node_b4', 'node_b5'],
+
+  'node_b1': ['node_m6', 'node_b2', 'end'],
+  'node_b2': ['node_m6', 'node_m7', 'node_b1', 'node_b3', 'end'],
+  'node_b3': ['node_m7', 'node_m8', 'node_b2', 'node_b4', 'end'],
+  'node_b4': ['node_m8', 'node_m9', 'node_b3', 'node_b5', 'end'],
+  'node_b5': ['node_m9', 'node_b4', 'end'],
+
+  'end': ['node_b1', 'node_b2', 'node_b3', 'node_b4', 'node_b5']
 };
 
 export const checkWinCondition = (gameState: GameState, playerId: PlayerId): boolean => {
