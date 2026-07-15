@@ -6,19 +6,25 @@ import { PlayerList } from './game/PlayerList';
 import { ControlPanel } from './game/ControlPanel';
 import { DrawModal } from './game/modals/DrawModal';
 import { EventOverlay } from './game/modals/EventOverlay';
-import { GambleModal } from './game/modals/GambleModal'; // Keep this import
+import { GambleModal } from './game/modals/GambleModal';
+import { BidModal } from './game/modals/BidModal'; // New Bid Modal
 import { audio } from '../services/audio';
+import { submitGambleBet, triggerGambleSpin } from '../engine/executor'; // Import executor functions
 
 interface GameScreenProps {
+  roomId: string; // Pass room ID down to allow direct gamble execution
   gameState: GameState | null;
   currentUser: any;
   onActionComplete?: (actionType: 'earn_init' | 'earn_confirm' | 'bid', params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }) => void;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ gameState, currentUser, onActionComplete }) => {
+export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, currentUser, onActionComplete }) => {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+
   const [prevTurn, setPrevTurn] = useState<number | null>(null);
   const [prevEvent, setPrevEvent] = useState<string | null>(null);
+  const [showEventOverlay, setShowEventOverlay] = useState(false);
 
   if (!gameState) {
     return <div className="text-white flex items-center justify-center h-screen">系统连线中...</div>;
@@ -31,17 +37,26 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, currentUser, 
   // Audio Hooks
   useEffect(() => {
     if (gameState.currentTurnIndex !== prevTurn) {
-        if (isMyTurn) audio.playTurnStart();
+        if (isMyTurn && !gameState.gambleState?.active) audio.playTurnStart();
         setPrevTurn(gameState.currentTurnIndex);
     }
-  }, [gameState.currentTurnIndex, isMyTurn, prevTurn]);
+  }, [gameState.currentTurnIndex, isMyTurn, prevTurn, gameState.gambleState]);
 
+  // Event Overlay Hook - 2 seconds auto-hide logic
   useEffect(() => {
     if (gameState.currentEvent && gameState.currentEvent !== prevEvent) {
         audio.playEventTrigger();
         setPrevEvent(gameState.currentEvent);
+        setShowEventOverlay(true);
+
+        // Hide overlay after 2 seconds to reveal underlying modals
+        const timer = setTimeout(() => {
+            setShowEventOverlay(false);
+        }, 2000);
+        return () => clearTimeout(timer);
     } else if (!gameState.currentEvent) {
         setPrevEvent(null);
+        setShowEventOverlay(false);
     }
   }, [gameState.currentEvent, prevEvent]);
 
@@ -57,30 +72,56 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, currentUser, 
     onActionComplete('earn_confirm', { chosenCombo: combo });
   };
 
-  const handleBid = (red: number, blue: number) => {
+  // Node selection triggers modal instead of right panel
+  const handleNodeClick = (nodeId: NodeId) => {
+      setSelectedNode(nodeId);
+      setIsBidModalOpen(true);
+  };
+
+  const handleBidConfirm = (red: number, blue: number) => {
     if (!isMyTurn || !selectedNode || !onActionComplete) return;
     audio.playBidSuccess(); // Bid initiated
     onActionComplete('bid', { targetId: selectedNode, red, blue });
+    setIsBidModalOpen(false);
+    setSelectedNode(null);
   };
 
-  const showEventOverlay = gameState.currentEvent && gameState.logs[gameState.logs.length - 1].message.includes('通报');
+  const handleGambleBet = async (amount: number) => {
+      if (!myPlayer) return;
+      await submitGambleBet(roomId, gameState, myPlayer.id, amount);
+  };
+
+  const handleGambleResolve = async () => {
+      // Triggered by GambleModal when all bets are in
+      await triggerGambleSpin(roomId, gameState);
+  };
 
   return (
     <div className="flex flex-col h-screen earth-bg p-4 gap-4 box-border relative">
 
       {showEventOverlay && <EventOverlay eventTitle={gameState.currentEvent} />}
 
-      {gameState.pendingDrawCards && isMyTurn && (
+      {gameState.pendingDrawCards && isMyTurn && !showEventOverlay && (
          <DrawModal options={gameState.pendingDrawCards} onSelect={handleDrawSelect} />
       )}
 
-      {/* Gamble Modal Dummy mount to avoid ts unused warning and fulfill logic partially */}
-      {gameState.gambleState?.active && (
+      {/* Gamble Modal shown if active and overlay is done */}
+      {gameState.gambleState?.active && !showEventOverlay && (
          <GambleModal
             gameState={gameState}
             myPlayerId={myPlayer.id}
-            onBet={(amount) => console.log('bet', amount)}
-            onResolve={() => console.log('resolve')}
+            onBet={handleGambleBet}
+            onResolve={handleGambleResolve}
+         />
+      )}
+
+      {/* Centralized Bid Modal */}
+      {isBidModalOpen && selectedNode && isMyTurn && !gameState.gambleState?.active && !gameState.pendingDrawCards && (
+         <BidModal
+            territory={gameState.territories[selectedNode]}
+            wallet={myPlayer.wallet}
+            onConfirm={handleBidConfirm}
+            onCancel={() => { setIsBidModalOpen(false); setSelectedNode(null); }}
          />
       )}
 
@@ -111,17 +152,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({ gameState, currentUser, 
 
         {/* Center: Map Board */}
         <div className="flex-1 min-w-0">
-          <MapBoard gameState={gameState} onNodeClick={setSelectedNode} />
+          <MapBoard gameState={gameState} onNodeClick={handleNodeClick} />
         </div>
 
-        {/* Right Column: Control Panel */}
-        <div className="w-72 flex-shrink-0">
+        {/* Right Column: Control Panel (Slimmed down) */}
+        <div className="w-64 flex-shrink-0">
           <ControlPanel
             currentPlayer={myPlayer || null}
             isMyTurn={isMyTurn}
-            selectedTerritory={selectedNode ? gameState.territories[selectedNode] : null}
             onEarnMoney={handleEarnMoney}
-            onBid={handleBid}
           />
         </div>
       </div>

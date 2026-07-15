@@ -129,7 +129,7 @@ function App() {
   // Active Game State
   return (
     <GameScreen
-      gameState={gameState}
+      roomId={roomId} gameState={gameState}
       currentUser={user}
       onActionComplete={async (actionType: any, bidParams?: any) => {
          await executePlayerAction(roomId, gameState, actionType, bidParams);
