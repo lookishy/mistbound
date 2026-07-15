@@ -23,7 +23,7 @@ export const BidModal: React.FC<BidModalProps> = ({ territory, wallet, onConfirm
             <div className="text-gray-400 text-sm mb-1">目标防线</div>
             <div className="text-xl font-bold text-yellow-500">{territory.name}</div>
             {canBid ? (
-                <div className="text-sm mt-1 text-gray-300">当前防线强度: <span className="text-white font-bold">{territory.currentPrice}</span></div>
+                <div className="text-sm mt-1 text-gray-300">领地标价: $ <span className="text-white font-bold">{territory.currentPrice}</span></div>
             ) : (
                 <div className="text-sm mt-1 text-red-500">该要塞受到神圣庇护，不可被攻占！</div>
             )}

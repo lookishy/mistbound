@@ -1,15 +1,18 @@
 import type { GameState, SpecialEvent, Territory, GambleState } from '../types/game';
 
-export const handleSpecialEvent = (gameState: GameState): { updatedTerritories: Record<string, Territory>, event: SpecialEvent, logMessage: string, gambleState?: GambleState } | null => {
+// Phase 1: Determine what event will happen (Triggers the UI overlay)
+export const determineSpecialEvent = (gameState: GameState): SpecialEvent => {
   if (gameState.roundCount % 4 !== 0 || gameState.roundCount === 0) {
-    return null; // Not an event round
+    return null;
   }
-
   const events: SpecialEvent[] = ['通货膨胀', '经济萧条', '地下赌局', '地产泡沫破裂'];
-  const event = events[Math.floor(Math.random() * events.length)];
+  return events[Math.floor(Math.random() * events.length)];
+};
+
+// Phase 2: Resolve the actual logic of the event (Called automatically after overlay finishes)
+export const resolveSpecialEvent = (gameState: GameState, event: SpecialEvent): { updatedTerritories: Record<string, Territory>, logMessage: string, gambleState?: GambleState } => {
   let logMessage = '';
   let gambleState: GambleState | undefined;
-
   const updatedTerritories = JSON.parse(JSON.stringify(gameState.territories)) as Record<string, Territory>;
 
   switch (event) {
@@ -52,5 +55,5 @@ export const handleSpecialEvent = (gameState: GameState): { updatedTerritories: 
       break;
   }
 
-  return { updatedTerritories, event, logMessage, gambleState };
+  return { updatedTerritories, logMessage, gambleState };
 };
