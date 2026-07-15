@@ -1,7 +1,11 @@
 import type { GameState, SpecialEvent, Territory, GambleState } from '../types/game';
 
+
 // Phase 1: Determine what event will happen (Triggers the UI overlay)
 export const determineSpecialEvent = (gameState: GameState): SpecialEvent => {
+  // SPECIAL EVENTS DISABLED TEMPORARILY FOR TESTING
+  return null;
+
   if (gameState.roundCount % 4 !== 0 || gameState.roundCount === 0) {
     return null;
   }
