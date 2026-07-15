@@ -27,17 +27,25 @@ export const checkWinCondition = (gameState: GameState, playerId: PlayerId): boo
     }
   }
 
-  if (!ownedNodes.has('start') || !ownedNodes.has('end')) {
+
+  // Start and End nodes cannot be owned by players directly, so we check if player owns nodes connected to start and end.
+  const startNeighbors = mapGraph['start'] || [];
+  const endNeighbors = mapGraph['end'] || [];
+
+  const hasStartConnection = startNeighbors.some(n => ownedNodes.has(n));
+  const hasEndConnection = endNeighbors.some(n => ownedNodes.has(n));
+
+  if (!hasStartConnection || !hasEndConnection) {
     return false;
   }
 
   const visited = new Set<NodeId>();
-  const stack: NodeId[] = ['start'];
+  const stack: NodeId[] = [...startNeighbors.filter(n => ownedNodes.has(n))];
 
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    if (current === 'end') {
+    if (endNeighbors.includes(current)) {
       return true;
     }
 
@@ -53,5 +61,6 @@ export const checkWinCondition = (gameState: GameState, playerId: PlayerId): boo
     }
   }
 
+;
   return false;
 };

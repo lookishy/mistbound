@@ -26,7 +26,12 @@ export const RuleModal: React.FC<RuleModalProps> = ({ onClose }) => {
 
             <section>
                 <h3 className="text-xl font-bold text-white mb-2">2. 军备补给（红晶与蓝晶）</h3>
+
                 <p>回合内，若不执行攻占，可点击【呼叫后勤补给】。你将从两套随机物资中任选其一。红蓝晶矿的隐秘市价随战局波动，切勿让敌军洞悉你的底牌。</p>
+                <p className="text-yellow-400 mt-2 text-sm border-l-2 border-yellow-600 pl-2">
+                    <span className="font-bold">核心机密：</span>红晶和蓝晶在每局游戏中分别代表 1 至 5 之间的一个固定整数。该数值在每一局开局时随机决定且各不相同，在游戏过程中对所有玩家保密，需要玩家根据战报表现进行推理。
+                </p>
+
             </section>
 
             <section>
