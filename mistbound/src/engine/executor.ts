@@ -4,7 +4,39 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { earnMoneyOptions, evaluateBid } from './mechanics';
 import { runBotTurn } from './bot';
 import { checkWinCondition } from './winCondition';
-import { handleSpecialEvent } from './events';
+import { determineSpecialEvent, resolveSpecialEvent } from './events';
+
+export const triggerSpecialEventResolution = async (roomId: string, currentState: GameState) => {
+    if (currentState.status !== 'event' || !currentState.pendingEvent) return;
+
+    const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
+
+    // Resolve the actual logic of the event that was pending
+    const resolveResult = resolveSpecialEvent(nextState, nextState.pendingEvent);
+
+    nextState.territories = resolveResult.updatedTerritories;
+    nextState.logs.push({
+        id: Date.now().toString() + "_evt",
+        timestamp: Date.now(),
+        message: resolveResult.logMessage
+    });
+
+    if (resolveResult.gambleState) {
+        nextState.gambleState = resolveResult.gambleState;
+    }
+
+    // Clear event overlay state, return to playing
+    nextState.currentEvent = null;
+    nextState.pendingEvent = null;
+    nextState.status = 'playing';
+
+    await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
+
+    // If it's a bot's turn and no gamble is active, trigger bot
+    if (nextState.players[nextState.currentTurnIndex].isBot && !nextState.gambleState) {
+        setTimeout(() => triggerBotTurn(roomId, nextState), 2000);
+    }
+}
 
 export const submitGambleBet = async (roomId: string, currentState: GameState, playerId: string, betAmount: number) => {
     const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
@@ -13,7 +45,6 @@ export const submitGambleBet = async (roomId: string, currentState: GameState, p
     const player = nextState.players.find(p => p.id === playerId);
     if (!player) return;
 
-    // Deduct bet from player (randomly taking from red or blue, favoring red if available)
     let remainingBet = betAmount;
     let actualBet = 0;
     while(remainingBet > 0 && (player.wallet.red > 0 || player.wallet.blue > 0)) {
@@ -29,7 +60,6 @@ export const submitGambleBet = async (roomId: string, currentState: GameState, p
     nextState.gambleState.bets[playerId] = actualBet;
     nextState.gambleState.pot += actualBet;
 
-    // Auto-bet for bots if not already done
     nextState.players.filter(p => p.isBot).forEach(bot => {
         if (nextState.gambleState!.bets[bot.id] === undefined) {
             let botBet = Math.floor(Math.random() * Math.min(3, bot.wallet.red + bot.wallet.blue + 1));
@@ -49,10 +79,8 @@ export const submitGambleBet = async (roomId: string, currentState: GameState, p
     const roomRef = doc(db, 'rooms', roomId);
     await updateDoc(roomRef, { gameState: nextState });
 
-    // Check if everyone has bet
     const allBet = nextState.players.every(p => nextState.gambleState!.bets[p.id] !== undefined);
     if (allBet) {
-        // Automatically transition to spinning
         setTimeout(() => triggerGambleSpin(roomId, nextState), 1000);
     }
 };
@@ -64,18 +92,14 @@ export const triggerGambleSpin = async (roomId: string, currentState: GameState)
     nextState.gambleState.phase = 'spinning';
     await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
 
-    // Wait 3 seconds for spin animation, then resolve
     setTimeout(async () => {
         const finalState = JSON.parse(JSON.stringify(nextState)) as GameState;
-
-        // Pick winner uniformly among all players
         const winnerIndex = Math.floor(Math.random() * finalState.players.length);
         const winner = finalState.players[winnerIndex];
 
         finalState.gambleState!.phase = 'resolved';
         finalState.gambleState!.winner = winner.id;
 
-        // Give pot to winner (all as red for simplicity, or split. Let's split evenly)
         const pot = finalState.gambleState!.pot;
         const half = Math.floor(pot / 2);
         winner.wallet.red += half;
@@ -89,13 +113,11 @@ export const triggerGambleSpin = async (roomId: string, currentState: GameState)
 
         await updateDoc(doc(db, 'rooms', roomId), { gameState: finalState });
 
-        // Wait 3 seconds showing winner, then close modal and resume game
         setTimeout(async () => {
             const closedState = JSON.parse(JSON.stringify(finalState)) as GameState;
-            closedState.gambleState = null; // close modal
+            closedState.gambleState = null;
             await updateDoc(doc(db, 'rooms', roomId), { gameState: closedState });
 
-            // Resume bot if it's bot's turn
             if (closedState.status === 'playing' && closedState.players[closedState.currentTurnIndex].isBot) {
                 setTimeout(() => triggerBotTurn(roomId, closedState), 2000);
             }
@@ -106,7 +128,7 @@ export const triggerGambleSpin = async (roomId: string, currentState: GameState)
 
 export const triggerBotTurn = async (roomId: string, currentState: GameState) => {
     let nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
-    if (nextState.gambleState) return; // Prevent bot turn if gamble is active
+    if (nextState.gambleState || nextState.status !== 'playing') return;
 
     const botResult = runBotTurn(nextState);
 
@@ -130,20 +152,12 @@ export const triggerBotTurn = async (roomId: string, currentState: GameState) =>
         } else {
             if (nextState.currentTurnIndex === 0) {
                 nextState.roundCount += 1;
-                const eventResult = handleSpecialEvent(nextState);
-                if (eventResult) {
-                    nextState.territories = eventResult.updatedTerritories;
-                    nextState.currentEvent = eventResult.event;
-                    if (eventResult.gambleState) {
-                        nextState.gambleState = eventResult.gambleState;
-                    }
-                    nextState.logs.push({
-                        id: Date.now().toString() + "_evt",
-                        timestamp: Date.now(),
-                        message: eventResult.logMessage
-                    });
-                } else {
-                    nextState.currentEvent = null;
+                const upcomingEvent = determineSpecialEvent(nextState);
+                if (upcomingEvent) {
+                    nextState.status = 'event';
+                    nextState.currentEvent = upcomingEvent;
+                    nextState.pendingEvent = upcomingEvent;
+                    // Note: We don't resolve logic here anymore. We wait for client to call triggerSpecialEventResolution.
                 }
             }
         }
@@ -164,6 +178,8 @@ export const executePlayerAction = async (
     params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }
 ) => {
     const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
+    if (nextState.status !== 'playing') return;
+
     const currentTurnIndex = nextState.currentTurnIndex;
     const player = nextState.players[currentTurnIndex];
     let logMessage = '';
@@ -216,7 +232,6 @@ export const executePlayerAction = async (
 
             logMessage = bidResult.message;
         } else {
-            // FIX: Removed deduction on failed bid
             logMessage = bidResult.message;
         }
     }
@@ -229,20 +244,11 @@ export const executePlayerAction = async (
         nextState.currentTurnIndex = (currentTurnIndex + 1) % nextState.players.length;
         if (nextState.currentTurnIndex === 0) {
             nextState.roundCount += 1;
-            const eventResult = handleSpecialEvent(nextState);
-            if (eventResult) {
-                nextState.territories = eventResult.updatedTerritories;
-                nextState.currentEvent = eventResult.event;
-                if (eventResult.gambleState) {
-                    nextState.gambleState = eventResult.gambleState;
-                }
-                nextState.logs.push({
-                    id: Date.now().toString() + "_evt",
-                    timestamp: Date.now(),
-                    message: eventResult.logMessage
-                });
-            } else {
-                nextState.currentEvent = null;
+            const upcomingEvent = determineSpecialEvent(nextState);
+            if (upcomingEvent) {
+                nextState.status = 'event';
+                nextState.currentEvent = upcomingEvent;
+                nextState.pendingEvent = upcomingEvent;
             }
         }
     }
@@ -258,5 +264,82 @@ export const executePlayerAction = async (
 
     if (nextState.status === 'playing' && nextState.players[nextState.currentTurnIndex].isBot && !nextState.gambleState) {
         setTimeout(() => triggerBotTurn(roomId, nextState), 2000);
+    }
+};
+
+export const updatePlayerPing = async (roomId: string, currentState: GameState, playerId: string) => {
+    const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
+    const playerIndex = nextState.players.findIndex(p => p.id === playerId);
+
+    if (playerIndex !== -1) {
+        nextState.players[playerIndex].lastPing = Date.now();
+        await updateDoc(doc(db, 'rooms', roomId), {
+            [`gameState.players.${playerIndex}.lastPing`]: Date.now()
+        });
+    }
+};
+
+export const checkAndKickDisconnectedPlayers = async (roomId: string, currentState: GameState, hostId: string) => {
+    // Only host performs heartbeat checks to avoid race conditions
+    if (currentState.hostId !== hostId) return;
+
+    let modified = false;
+    const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
+    const now = Date.now();
+
+    nextState.players.forEach(player => {
+        if (!player.isBot && player.connected) {
+            // 35 seconds without ping = disconnect
+            if (now - player.lastPing > 35000) {
+                player.connected = false;
+                player.isBot = true; // Turn them into a bot
+                player.name = `${player.name} (脱机接管)`;
+                modified = true;
+
+                nextState.logs.push({
+                    id: Date.now().toString() + "_" + player.id,
+                    timestamp: Date.now(),
+                    message: `【通讯中断】${player.name} 失去连接，AI 僚机已接管其防区！`
+                });
+
+                // Force close pending actions for this player if it's their turn
+                if (nextState.currentTurnIndex === nextState.players.findIndex(p => p.id === player.id)) {
+                    nextState.pendingDrawCards = null;
+                }
+
+                // If gambling is active and they haven't bet, auto bet
+                if (nextState.gambleState && nextState.gambleState.phase === 'betting' && nextState.gambleState.bets[player.id] === undefined) {
+                    // Logic from submitGambleBet for bots
+                    let botBet = Math.floor(Math.random() * Math.min(3, player.wallet.red + player.wallet.blue + 1));
+                    let bRemaining = botBet;
+                    let bActual = 0;
+                    while(bRemaining > 0 && (player.wallet.red > 0 || player.wallet.blue > 0)) {
+                        if (player.wallet.red > 0) { player.wallet.red -= 1; }
+                        else { player.wallet.blue -= 1; }
+                        bRemaining -= 1;
+                        bActual += 1;
+                    }
+                    nextState.gambleState.bets[player.id] = bActual;
+                    nextState.gambleState.pot += bActual;
+                }
+            }
+        }
+    });
+
+    if (modified) {
+        await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
+
+        // Check if gamble should resolve now that the bot auto-bet
+        if (nextState.gambleState && nextState.gambleState.phase === 'betting') {
+            const allBet = nextState.players.every(p => nextState.gambleState!.bets[p.id] !== undefined);
+            if (allBet) {
+                setTimeout(() => triggerGambleSpin(roomId, nextState), 1000);
+            }
+        }
+
+        // If it was their turn, trigger bot turn
+        if (nextState.status === 'playing' && nextState.players[nextState.currentTurnIndex].isBot && !nextState.gambleState) {
+            setTimeout(() => triggerBotTurn(roomId, nextState), 2000);
+        }
     }
 };

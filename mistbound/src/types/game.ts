@@ -1,7 +1,6 @@
 export type NodeId = string;
 export type PlayerId = string;
 
-// The types of system events
 export type SpecialEvent = '通货膨胀' | '经济萧条' | '地下赌局' | '地产泡沫破裂' | null;
 
 export interface TokenCombo {
@@ -17,11 +16,12 @@ export interface Player {
   isBot: boolean;
   wallet: TokenCombo;
   connected: boolean;
+  lastPing: number; // For heartbeat disconnect detection
 }
 
 export interface Territory {
   id: NodeId;
-  name: string; // 中文名
+  name: string;
   baseValue: number;
   currentPrice: number;
   ownerId: PlayerId | null;
@@ -38,14 +38,14 @@ export interface ActionLog {
 
 export interface GambleState {
   active: boolean;
-  bets: Record<PlayerId, number>; // How many total tokens bet (max 2)
+  bets: Record<PlayerId, number>;
   pot: number;
   winner: PlayerId | null;
   phase: 'betting' | 'spinning' | 'resolved';
 }
 
 export interface GameState {
-  status: 'waiting' | 'playing' | 'finished';
+  status: 'waiting' | 'playing' | 'event' | 'finished'; // Added 'event' for freezing game flow during overlay
   winner: PlayerId | null;
   hostId: PlayerId;
 
@@ -60,11 +60,9 @@ export interface GameState {
   territories: Record<NodeId, Territory>;
 
   currentEvent: SpecialEvent;
+  pendingEvent: SpecialEvent; // The event about to be resolved
 
-  // For the "Choose 1 of 2 cards" mechanic
   pendingDrawCards: [TokenCombo, TokenCombo] | null;
-
-  // For gambling event
   gambleState: GambleState | null;
 
   roundCount: number;

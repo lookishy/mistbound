@@ -7,12 +7,13 @@ import { ControlPanel } from './game/ControlPanel';
 import { DrawModal } from './game/modals/DrawModal';
 import { EventOverlay } from './game/modals/EventOverlay';
 import { GambleModal } from './game/modals/GambleModal';
-import { BidModal } from './game/modals/BidModal'; // New Bid Modal
+import { BidModal } from './game/modals/BidModal';
+import { RuleModal } from './game/modals/RuleModal'; // New Rule Modal
 import { audio } from '../services/audio';
-import { submitGambleBet, triggerGambleSpin } from '../engine/executor'; // Import executor functions
+import { submitGambleBet, triggerGambleSpin, triggerSpecialEventResolution } from '../engine/executor';
 
 interface GameScreenProps {
-  roomId: string; // Pass room ID down to allow direct gamble execution
+  roomId: string;
   gameState: GameState | null;
   currentUser: any;
   onActionComplete?: (actionType: 'earn_init' | 'earn_confirm' | 'bid', params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }) => void;
@@ -21,10 +22,10 @@ interface GameScreenProps {
 export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, currentUser, onActionComplete }) => {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
 
   const [prevTurn, setPrevTurn] = useState<number | null>(null);
   const [prevEvent, setPrevEvent] = useState<string | null>(null);
-  const [showEventOverlay, setShowEventOverlay] = useState(false);
 
   if (!gameState) {
     return <div className="text-white flex items-center justify-center h-screen">系统连线中...</div>;
@@ -42,23 +43,22 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
     }
   }, [gameState.currentTurnIndex, isMyTurn, prevTurn, gameState.gambleState]);
 
-  // Event Overlay Hook - 2 seconds auto-hide logic
+  // Event Overlay Hook - 2 seconds auto-hide logic AND resolve event
   useEffect(() => {
-    if (gameState.currentEvent && gameState.currentEvent !== prevEvent) {
+    if (gameState.status === 'event' && gameState.currentEvent && gameState.currentEvent !== prevEvent) {
         audio.playEventTrigger();
         setPrevEvent(gameState.currentEvent);
-        setShowEventOverlay(true);
 
-        // Hide overlay after 2 seconds to reveal underlying modals
-        const timer = setTimeout(() => {
-            setShowEventOverlay(false);
-        }, 2000);
-        return () => clearTimeout(timer);
-    } else if (!gameState.currentEvent) {
+        if (currentUser.uid === gameState.hostId || (gameState.players[0].id === currentUser.uid && !gameState.players.find(p => p.id === gameState.hostId)?.connected)) {
+            const timer = setTimeout(async () => {
+                await triggerSpecialEventResolution(roomId, gameState);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    } else if (gameState.status !== 'event') {
         setPrevEvent(null);
-        setShowEventOverlay(false);
     }
-  }, [gameState.currentEvent, prevEvent]);
+  }, [gameState.status, gameState.currentEvent, prevEvent, roomId, currentUser.uid, gameState.hostId, gameState.players]);
 
 
   const handleEarnMoney = () => {
@@ -72,7 +72,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
     onActionComplete('earn_confirm', { chosenCombo: combo });
   };
 
-  // Node selection triggers modal instead of right panel
   const handleNodeClick = (nodeId: NodeId) => {
       setSelectedNode(nodeId);
       setIsBidModalOpen(true);
@@ -80,7 +79,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
 
   const handleBidConfirm = (red: number, blue: number) => {
     if (!isMyTurn || !selectedNode || !onActionComplete) return;
-    audio.playBidSuccess(); // Bid initiated
+    audio.playBidSuccess();
     onActionComplete('bid', { targetId: selectedNode, red, blue });
     setIsBidModalOpen(false);
     setSelectedNode(null);
@@ -92,21 +91,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
   };
 
   const handleGambleResolve = async () => {
-      // Triggered by GambleModal when all bets are in
       await triggerGambleSpin(roomId, gameState);
   };
 
   return (
     <div className="flex flex-col h-screen earth-bg p-4 gap-4 box-border relative">
 
-      {showEventOverlay && <EventOverlay eventTitle={gameState.currentEvent} />}
+      {gameState.status === 'event' && <EventOverlay eventTitle={gameState.currentEvent} />}
 
-      {gameState.pendingDrawCards && isMyTurn && !showEventOverlay && (
+      {gameState.pendingDrawCards && isMyTurn && gameState.status !== 'event' && (
          <DrawModal options={gameState.pendingDrawCards} onSelect={handleDrawSelect} />
       )}
 
-      {/* Gamble Modal shown if active and overlay is done */}
-      {gameState.gambleState?.active && !showEventOverlay && (
+      {gameState.gambleState?.active && gameState.status !== 'event' && (
          <GambleModal
             gameState={gameState}
             myPlayerId={myPlayer.id}
@@ -115,8 +112,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
          />
       )}
 
-      {/* Centralized Bid Modal */}
-      {isBidModalOpen && selectedNode && isMyTurn && !gameState.gambleState?.active && !gameState.pendingDrawCards && (
+      {isBidModalOpen && selectedNode && isMyTurn && !gameState.gambleState?.active && !gameState.pendingDrawCards && gameState.status !== 'event' && (
          <BidModal
             territory={gameState.territories[selectedNode]}
             wallet={myPlayer.wallet}
@@ -125,20 +121,29 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
          />
       )}
 
+      {isRuleModalOpen && <RuleModal onClose={() => setIsRuleModalOpen(false)} />}
+
       {/* Top Header */}
       <div className="flex justify-between items-center text-gray-300 font-mono text-sm px-2">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold text-yellow-600 tracking-widest">雾境占拓 // MISTBOUND</h1>
-          <span className="earth-panel px-2 py-1 rounded">状态: {gameState.status === 'playing' ? '激战中' : gameState.status}</span>
+          <span className="earth-panel px-2 py-1 rounded">状态: {gameState.status === 'playing' ? '激战中' : (gameState.status === 'event' ? '全局事件突发' : gameState.status)}</span>
           {gameState.winner && (
             <span className="bg-green-900/80 text-green-400 px-4 py-1 rounded border border-green-500 animate-pulse font-bold">
               最终胜利者: {gameState.players.find(p => p.id === gameState.winner)?.name}
             </span>
           )}
+
+          <button
+            onClick={() => setIsRuleModalOpen(true)}
+            className="bg-yellow-800/80 hover:bg-yellow-600 text-yellow-100 px-3 py-1 rounded border border-yellow-600 font-bold transition-all shadow-[0_0_5px_rgba(218,165,32,0.5)] flex items-center gap-1"
+          >
+             <span>❓</span> 规则
+          </button>
         </div>
-        {gameState.currentEvent && (
+        {gameState.currentEvent && gameState.status !== 'event' && (
           <div className="bg-red-900/80 text-red-400 px-4 py-1 rounded border border-red-500 animate-pulse font-bold text-lg">
-            战报: {gameState.currentEvent}
+            上期战报: {gameState.currentEvent}
           </div>
         )}
       </div>
@@ -155,7 +160,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
           <MapBoard gameState={gameState} onNodeClick={handleNodeClick} />
         </div>
 
-        {/* Right Column: Control Panel (Slimmed down) */}
+        {/* Right Column: Control Panel */}
         <div className="w-64 flex-shrink-0">
           <ControlPanel
             currentPlayer={myPlayer || null}

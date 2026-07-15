@@ -54,7 +54,8 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     avatarUrl: hostUser.photoURL || '',
     isBot: false,
     wallet: { red: 0, blue: 0 },
-    connected: true
+    connected: true,
+    lastPing: Date.now()
   };
 
   const initialGameState: GameState = {
@@ -66,6 +67,7 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     secretValues: { x, y },
     territories: generateInitialMap(),
     currentEvent: null,
+    pendingEvent: null,
     pendingDrawCards: null,
     gambleState: null,
     roundCount: 0,
@@ -117,7 +119,8 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
     avatarUrl: user.photoURL || '',
     isBot: false,
     wallet: { red: 0, blue: 0 },
-    connected: true
+    connected: true,
+    lastPing: Date.now()
   };
 
   await updateDoc(roomRef, {
@@ -153,7 +156,8 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
         avatarUrl: '',
         isBot: true,
         wallet: { red: 0, blue: 0 },
-        connected: true
+        connected: true,
+    lastPing: Date.now()
     };
 
     await updateDoc(roomRef, {
