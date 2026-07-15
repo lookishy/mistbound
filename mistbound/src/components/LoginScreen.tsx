@@ -35,7 +35,7 @@ export const LoginScreen: React.FC<{ onLogin: (user: any) => void }> = ({ onLogi
 
         <p className="mt-4 text-xs text-gray-500 text-center">
           * 仅限 @tsunjin.edu.my 域名用户</p>
-        <p className="mt-8 text-xs text-blue-500/50 animate-pulse text-center">Initializing Mistbound Network...
+        <p className="mt-8 text-xs text-blue-500/50 animate-pulse text-center">Initializing Mistbound Network... v1.0.0
         </p>
 
         {error && (
