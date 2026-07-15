@@ -4,39 +4,25 @@ import type { Territory, Player, TokenCombo } from '../types/game';
 // Action 1: Earn Money now generates TWO options
 
 // Action 1: Earn Money now generates TWO options
-export const earnMoneyOptions = (x: number, y: number): [TokenCombo, TokenCombo] => {
-  const B = x + y;
 
-  if (B <= 4) {
-      // Big pool: 4-5 tokens. Complementary options.
-      const pool = [
-          [{ red: 4, blue: 0 }, { red: 1, blue: 3 }],
-          [{ red: 0, blue: 4 }, { red: 3, blue: 1 }],
-          [{ red: 3, blue: 2 }, { red: 2, blue: 3 }],
-          [{ red: 2, blue: 2 }, { red: 4, blue: 1 }],
-          [{ red: 1, blue: 4 }, { red: 5, blue: 0 }]
-      ];
-      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
-  } else if (B >= 5 && B <= 7) {
-      // Standard pool: 2-3 tokens. Complementary options.
-      const pool = [
-          [{ red: 2, blue: 0 }, { red: 0, blue: 3 }],
-          [{ red: 0, blue: 2 }, { red: 3, blue: 0 }],
-          [{ red: 1, blue: 2 }, { red: 2, blue: 1 }],
-          [{ red: 2, blue: 0 }, { red: 1, blue: 1 }],
-          [{ red: 1, blue: 1 }, { red: 0, blue: 2 }]
-      ];
-      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
-  } else {
-      // Tight pool: 1-2 tokens. Complementary options.
-      const pool = [
-          [{ red: 2, blue: 0 }, { red: 0, blue: 2 }],
-          [{ red: 1, blue: 0 }, { red: 0, blue: 1 }],
-          [{ red: 1, blue: 0 }, { red: 1, blue: 1 }],
-          [{ red: 0, blue: 1 }, { red: 1, blue: 1 }]
-      ];
-      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
+export const earnMoneyOptions = (_x: number, _y: number): [TokenCombo, TokenCombo] => {
+  // Generates a random total amount of tokens (N) between 1 and 5
+  const N = Math.floor(Math.random() * 5) + 1;
+
+  // Generate two options where red + blue = N, but red1 != red2
+  const red1 = Math.floor(Math.random() * (N + 1));
+  const blue1 = N - red1;
+
+  let red2 = Math.floor(Math.random() * (N + 1));
+  while (red2 === red1) {
+      red2 = Math.floor(Math.random() * (N + 1));
   }
+  const blue2 = N - red2;
+
+  return [
+      { red: red1, blue: blue1 },
+      { red: red2, blue: blue2 }
+  ];
 };
 
 export interface BidResult {
@@ -48,6 +34,7 @@ export interface BidResult {
 }
 
 // Action 2: Bid on Territory
+
 export const evaluateBid = (
   bidRed: number,
   bidBlue: number,
@@ -64,7 +51,6 @@ export const evaluateBid = (
     return { success: false, actualValue: 0, message: `资金不足，无法执行攻占。资金已安全退回！` };
   }
 
-  // Cannot buy START or END
   if (territory.id === 'start' || territory.id === 'end') {
      return { success: false, actualValue: 0, message: `大本营（起点/终点）不可被攻占！资金已安全退回！` };
   }
@@ -89,14 +75,13 @@ export const evaluateBid = (
       actualValue: P,
       newPrice,
       refund,
-      message: `${player.name} 成功夺取【${territory.name}】！(溢价部分化作战争损耗，不予找零)`
+      message: `[前线战报] ${player.name} 对【${territory.name}】发起攻势，投入了 ${bidRed} 红晶、${bidBlue} 蓝晶！战线贯通，成功夺取领地！`
     };
   } else {
-    // UPDATED FAIL MESSAGE
     return {
       success: false,
       actualValue: P,
-      message: `资金不足！${player.name} 对【${territory.name}】的攻势被击退。投入的 ${bidRed}红${bidBlue}蓝 代币已安全退回指挥部！`
+      message: `[前线战报] ${player.name} 对【${territory.name}】发起攻势，投入了 ${bidRed} 红晶、${bidBlue} 蓝晶！资产不足，攻势被击退，代币已安全退回钱包！`
     };
   }
 };

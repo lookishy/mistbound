@@ -35,6 +35,26 @@ const ExtensionModal = ({ onConfirm }: { onConfirm: () => void }) => (
     </div>
 );
 
+
+const WinModal = ({ winnerName, onReturn }: { winnerName: string, onReturn: () => void }) => (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+      <div className="earth-panel p-12 rounded-2xl border-4 border-yellow-600 max-w-2xl w-full relative shadow-[0_0_80px_rgba(218,165,32,0.8)] text-center animate-[pulse_3s_ease-in-out_infinite]">
+        <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-300 mb-6 drop-shadow-[0_0_10px_rgba(255,215,0,0.8)]">
+          战线贯通，雾境主宰！
+        </h2>
+        <div className="text-3xl font-bold text-white mb-10">
+          最终胜利者：<span className="text-yellow-400">{winnerName}</span>
+        </div>
+        <button
+          onClick={onReturn}
+          className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-4 px-12 rounded-lg transition-all border-2 border-yellow-500 text-xl shadow-[0_0_20px_rgba(218,165,32,0.5)]"
+        >
+          返回游戏大厅
+        </button>
+      </div>
+    </div>
+);
+
 export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, currentUser, onActionComplete }) => {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
@@ -156,6 +176,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
 
 
       {isRuleModalOpen && <RuleModal onClose={() => setIsRuleModalOpen(false)} />}
+
+      {gameState.status === 'finished' && gameState.winner && (
+          <WinModal
+            winnerName={gameState.players.find(p => p.id === gameState.winner)?.name || '未知玩家'}
+            onReturn={() => window.location.reload()}
+          />
+      )}
+
 
       {gameState.turnExtension === 'pending' && isMyTurn && (
           <ExtensionModal onConfirm={handleExtensionConfirm} />
