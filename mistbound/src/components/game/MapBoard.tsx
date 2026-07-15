@@ -105,7 +105,7 @@ export const MapBoard: React.FC<MapBoardProps> = ({ gameState, onNodeClick }) =>
               style={{ transformOrigin: `${pos.cx}px ${pos.cy}px` }}
             >
               {/* Scale wrapping to prevent layout jitter on hover */}
-              <g className="transition-transform duration-200 ease-in-out group-hover:scale-110">
+              <g className="transition-transform duration-200 ease-in-out group-hover:-translate-y-1">
                 <circle
                   cx={pos.cx}
                   cy={pos.cy}

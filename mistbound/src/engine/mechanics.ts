@@ -59,16 +59,16 @@ export const evaluateBid = (
   player: Player
 ): BidResult => {
   if (territory.locked) {
-    return { success: false, actualValue: 0, message: `领地【${territory.name}】已永久锁定，无法购买。` };
+    return { success: false, actualValue: 0, message: `防线【${territory.name}】已永久封锁，无法攻占。资金已安全退回！` };
   }
 
   if (player.wallet.red < bidRed || player.wallet.blue < bidBlue) {
-    return { success: false, actualValue: 0, message: `资金不足，无法执行报价。` };
+    return { success: false, actualValue: 0, message: `资金不足，无法执行攻占。资金已安全退回！` };
   }
 
   // Cannot buy START or END
   if (territory.id === 'start' || territory.id === 'end') {
-     return { success: false, actualValue: 0, message: `大本营（起点/终点）不可被购买！` };
+     return { success: false, actualValue: 0, message: `大本营（起点/终点）不可被攻占！资金已安全退回！` };
   }
 
   const P = bidRed * x + bidBlue * y;
@@ -91,13 +91,14 @@ export const evaluateBid = (
       actualValue: P,
       newPrice,
       refund,
-      message: `${player.name} 成功夺取【${territory.name}】！(溢价不找零)`
+      message: `${player.name} 成功夺取【${territory.name}】！(溢价部分化作战争损耗，不予找零)`
     };
   } else {
+    // UPDATED FAIL MESSAGE
     return {
       success: false,
       actualValue: P,
-      message: `${player.name} 对【${territory.name}】投入 ${bidRed}红${bidBlue}蓝... 被无情拒绝了！(金额太低)`
+      message: `资金不足！${player.name} 对【${territory.name}】的攻势被击退。投入的 ${bidRed}红${bidBlue}蓝 代币已安全退回指挥部！`
     };
   }
 };
