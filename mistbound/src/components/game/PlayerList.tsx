@@ -18,13 +18,13 @@ export const PlayerList: React.FC<PlayerListProps> = ({ players, currentTurnInde
         return (
           <div
             key={player.id}
-            className={`flex flex-col items-center bg-[#1A1814] rounded p-3 border-2 transition-all ${
+            className={`flex flex-col items-center bg-[#1A1814] rounded p-1 border-2 transition-all ${
               isCurrentTurn ? `${borderColors[index]} shadow-[0_0_15px_rgba(232,224,213,0.3)] scale-105` : 'border-[#5C4033]'
             }`}
             style={{ width: '140px' }}
           >
             {/* Tokens Display (Public) */}
-            <div className="flex gap-2 mb-2 bg-black/60 px-2 py-1 rounded w-full justify-center">
+            <div className="flex gap-2 mb-1 bg-black/60 px-2 py-1 rounded w-full justify-center">
               <div className="flex items-center text-red-500 font-bold">
                 <span className="w-3 h-3 bg-red-600 rounded-full mr-1 inline-block border border-red-800"></span>
                 {player.wallet.red}
@@ -36,7 +36,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({ players, currentTurnInde
             </div>
 
             {/* Avatar / Identity */}
-            <div className={`w-12 h-12 rounded-full mb-2 flex items-center justify-center font-bold text-xl text-white shadow-inner ${playerColors[index]}`}>
+            <div className={`w-10 h-10 rounded-full mb-1 flex items-center justify-center font-bold text-xl text-white shadow-inner ${playerColors[index]}`}>
               {player.name.charAt(0).toUpperCase()}
             </div>
 

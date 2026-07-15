@@ -55,7 +55,7 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     isBot: false,
     wallet: { red: 0, blue: 0 },
     connected: true,
-    lastPing: Date.now()
+
   };
 
   const initialGameState: GameState = {
@@ -71,6 +71,9 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     pendingDrawCards: null,
     gambleState: null,
     roundCount: 0,
+    turnStartTime: Date.now(),
+    turnExtension: 'none',
+    turnExtensionTime: 0,
     logs: [
       {
         id: Date.now().toString(),
@@ -120,7 +123,7 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
     isBot: false,
     wallet: { red: 0, blue: 0 },
     connected: true,
-    lastPing: Date.now()
+
   };
 
   await updateDoc(roomRef, {
@@ -157,7 +160,7 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
         isBot: true,
         wallet: { red: 0, blue: 0 },
         connected: true,
-    lastPing: Date.now()
+
     };
 
     await updateDoc(roomRef, {

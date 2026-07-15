@@ -10,7 +10,7 @@ import { GambleModal } from './game/modals/GambleModal';
 import { BidModal } from './game/modals/BidModal';
 import { RuleModal } from './game/modals/RuleModal'; // New Rule Modal
 import { audio } from '../services/audio';
-import { submitGambleBet, triggerGambleSpin, triggerSpecialEventResolution } from '../engine/executor';
+import { submitGambleBet, triggerGambleSpin, triggerSpecialEventResolution, extendTurnTime, checkTurnTimeout } from '../engine/executor';
 
 interface GameScreenProps {
   roomId: string;
@@ -18,6 +18,22 @@ interface GameScreenProps {
   currentUser: any;
   onActionComplete?: (actionType: 'earn_init' | 'earn_confirm' | 'bid', params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }) => void;
 }
+
+
+const ExtensionModal = ({ onConfirm }: { onConfirm: () => void }) => (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="earth-panel p-8 rounded-xl border border-yellow-600 max-w-sm w-full relative shadow-[0_0_30px_rgba(218,165,32,0.8)] text-center">
+        <h2 className="text-2xl font-black text-yellow-500 mb-4">需要更多思考时间吗？</h2>
+        <p className="text-gray-300 mb-6 text-sm">指挥部正在等待你的决策。15秒无响应将视为通讯中断。</p>
+        <button
+          onClick={onConfirm}
+          className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-3 px-8 rounded-lg transition-all w-full border border-yellow-500"
+        >
+          确认 (延长30秒)
+        </button>
+      </div>
+    </div>
+);
 
 export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, currentUser, onActionComplete }) => {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
@@ -60,6 +76,23 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
     }
   }, [gameState.status, gameState.currentEvent, prevEvent, roomId, currentUser.uid, gameState.hostId, gameState.players]);
 
+
+
+  // Timeout check loop
+  useEffect(() => {
+    if (gameState.status !== 'playing' || !currentUser) return;
+
+    // Host checks timeouts
+    const interval = setInterval(() => {
+      checkTurnTimeout(roomId, gameState, currentUser.uid);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState, roomId, currentUser]);
+
+  const handleExtensionConfirm = () => {
+      extendTurnTime(roomId, gameState, currentUser.uid);
+  };
 
   const handleEarnMoney = () => {
     if (!isMyTurn || !onActionComplete) return;
@@ -121,7 +154,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
          />
       )}
 
+
       {isRuleModalOpen && <RuleModal onClose={() => setIsRuleModalOpen(false)} />}
+
+      {gameState.turnExtension === 'pending' && isMyTurn && (
+          <ExtensionModal onConfirm={handleExtensionConfirm} />
+      )}
+
 
       {/* Top Header */}
       <div className="flex justify-between items-center text-gray-300 font-mono text-sm px-2">
@@ -171,7 +210,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
       </div>
 
       {/* Bottom Area: Players List */}
-      <div className="h-40 flex-shrink-0 earth-panel rounded">
+      <div className="h-28 flex-shrink-0 earth-panel rounded">
         <PlayerList players={gameState.players} currentTurnIndex={gameState.currentTurnIndex} />
       </div>
     </div>

@@ -242,6 +242,8 @@ export const executePlayerAction = async (
         logMessage += `【前线急报】${player.name} 成功贯通战线，夺取最终胜利！`;
     } else {
         nextState.currentTurnIndex = (currentTurnIndex + 1) % nextState.players.length;
+        nextState.turnStartTime = Date.now();
+        nextState.turnExtension = 'none';
         if (nextState.currentTurnIndex === 0) {
             nextState.roundCount += 1;
             const upcomingEvent = determineSpecialEvent(nextState);
@@ -267,79 +269,91 @@ export const executePlayerAction = async (
     }
 };
 
-export const updatePlayerPing = async (roomId: string, currentState: GameState, playerId: string) => {
-    const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
-    const playerIndex = nextState.players.findIndex(p => p.id === playerId);
 
-    if (playerIndex !== -1) {
-        nextState.players[playerIndex].lastPing = Date.now();
-        await updateDoc(doc(db, 'rooms', roomId), {
-            [`gameState.players.${playerIndex}.lastPing`]: Date.now()
-        });
-    }
-};
 
-export const checkAndKickDisconnectedPlayers = async (roomId: string, currentState: GameState, hostId: string) => {
-    // Only host performs heartbeat checks to avoid race conditions
+export const checkTurnTimeout = async (roomId: string, currentState: GameState, hostId: string) => {
+    // Only host performs timeout checks
     if (currentState.hostId !== hostId) return;
+    if (currentState.status !== 'playing') return;
 
     let modified = false;
     const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
     const now = Date.now();
+    const currentTurnPlayer = nextState.players[nextState.currentTurnIndex];
 
-    nextState.players.forEach(player => {
-        if (!player.isBot && player.connected) {
-            // 35 seconds without ping = disconnect
-            if (now - player.lastPing > 35000) {
-                player.connected = false;
-                player.isBot = true; // Turn them into a bot
-                player.name = `${player.name} (脱机接管)`;
-                modified = true;
+    if (currentTurnPlayer.isBot || !currentTurnPlayer.connected) return;
 
-                nextState.logs.push({
-                    id: Date.now().toString() + "_" + player.id,
-                    timestamp: Date.now(),
-                    message: `【通讯中断】${player.name} 失去连接，AI 僚机已接管其防区！`
-                });
+    // 120s base time, +30s if extended. (But popup happens when base is exhausted)
+    const timeElapsed = now - nextState.turnStartTime;
 
-                // Force close pending actions for this player if it's their turn
-                if (nextState.currentTurnIndex === nextState.players.findIndex(p => p.id === player.id)) {
-                    nextState.pendingDrawCards = null;
-                }
+    if (nextState.turnExtension === 'none' && timeElapsed > 120000) {
+        // Base time exhausted, popup extension
+        nextState.turnExtension = 'pending';
+        nextState.turnExtensionTime = now;
+        modified = true;
+    } else if (nextState.turnExtension === 'pending') {
+        // Wait 15s for response
+        const extensionElapsed = now - nextState.turnExtensionTime;
+        if (extensionElapsed > 15000) {
+            // Player did not respond, disconnect them
+            currentTurnPlayer.connected = false;
+            currentTurnPlayer.isBot = true;
+            currentTurnPlayer.name = `${currentTurnPlayer.name} (脱机接管)`;
 
-                // If gambling is active and they haven't bet, auto bet
-                if (nextState.gambleState && nextState.gambleState.phase === 'betting' && nextState.gambleState.bets[player.id] === undefined) {
-                    // Logic from submitGambleBet for bots
-                    let botBet = Math.floor(Math.random() * Math.min(3, player.wallet.red + player.wallet.blue + 1));
-                    let bRemaining = botBet;
-                    let bActual = 0;
-                    while(bRemaining > 0 && (player.wallet.red > 0 || player.wallet.blue > 0)) {
-                        if (player.wallet.red > 0) { player.wallet.red -= 1; }
-                        else { player.wallet.blue -= 1; }
-                        bRemaining -= 1;
-                        bActual += 1;
-                    }
-                    nextState.gambleState.bets[player.id] = bActual;
-                    nextState.gambleState.pot += bActual;
-                }
-            }
+            nextState.logs.push({
+                id: Date.now().toString() + "_" + currentTurnPlayer.id,
+                timestamp: Date.now(),
+                message: `【通讯中断】${currentTurnPlayer.name} 失去连接，AI 僚机已接管其防区！`
+            });
+
+            nextState.pendingDrawCards = null;
+            modified = true;
         }
-    });
+    } else if (nextState.turnExtension === 'granted') {
+         // Additional 30s elapsed? -> force skip turn
+         const extensionElapsed = now - nextState.turnExtensionTime;
+         if (extensionElapsed > 30000) {
+              // Time's up entirely, skip turn but keep connected
+              nextState.logs.push({
+                  id: Date.now().toString() + "_skip",
+                  timestamp: Date.now(),
+                  message: `【指挥延误】${currentTurnPlayer.name} 思考超时，错失本轮战机！`
+              });
+
+              nextState.pendingDrawCards = null;
+              nextState.currentTurnIndex = (nextState.currentTurnIndex + 1) % nextState.players.length;
+              if (nextState.currentTurnIndex === 0) {
+                  nextState.roundCount += 1;
+                  const upcomingEvent = determineSpecialEvent(nextState);
+                  if (upcomingEvent) {
+                      nextState.status = 'event';
+                      nextState.currentEvent = upcomingEvent;
+                      nextState.pendingEvent = upcomingEvent;
+                  }
+              }
+              nextState.turnStartTime = Date.now();
+              nextState.turnExtension = 'none';
+              modified = true;
+         }
+    }
 
     if (modified) {
         await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
 
-        // Check if gamble should resolve now that the bot auto-bet
-        if (nextState.gambleState && nextState.gambleState.phase === 'betting') {
-            const allBet = nextState.players.every(p => nextState.gambleState!.bets[p.id] !== undefined);
-            if (allBet) {
-                setTimeout(() => triggerGambleSpin(roomId, nextState), 1000);
-            }
-        }
-
-        // If it was their turn, trigger bot turn
+        // If it was their turn, trigger bot turn or if it just advanced to a bot
         if (nextState.status === 'playing' && nextState.players[nextState.currentTurnIndex].isBot && !nextState.gambleState) {
             setTimeout(() => triggerBotTurn(roomId, nextState), 2000);
         }
     }
 };
+
+export const extendTurnTime = async (roomId: string, currentState: GameState, playerId: string) => {
+    if (currentState.players[currentState.currentTurnIndex].id !== playerId) return;
+    if (currentState.turnExtension !== 'pending') return;
+
+    const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
+    nextState.turnExtension = 'granted';
+    nextState.turnExtensionTime = Date.now();
+
+    await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
+}
