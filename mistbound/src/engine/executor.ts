@@ -289,6 +289,7 @@ export const checkTurnTimeout = async (roomId: string, currentState: GameState, 
 
     if (currentTurnPlayer.isBot || !currentTurnPlayer.connected) return;
 
+
     // 120s base time, +30s if extended. (But popup happens when base is exhausted)
     const timeElapsed = now - nextState.turnStartTime;
 
@@ -330,18 +331,13 @@ export const checkTurnTimeout = async (roomId: string, currentState: GameState, 
               nextState.currentTurnIndex = (nextState.currentTurnIndex + 1) % nextState.players.length;
               if (nextState.currentTurnIndex === 0) {
                   nextState.roundCount += 1;
-                  const upcomingEvent = determineSpecialEvent(nextState);
-                  if (upcomingEvent) {
-                      nextState.status = 'event';
-                      nextState.currentEvent = upcomingEvent;
-                      nextState.pendingEvent = upcomingEvent;
-                  }
               }
               nextState.turnStartTime = Date.now();
               nextState.turnExtension = 'none';
               modified = true;
          }
     }
+
 
     if (modified) {
         await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
