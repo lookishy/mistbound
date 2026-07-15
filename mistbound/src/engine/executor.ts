@@ -25,10 +25,16 @@ export const triggerSpecialEventResolution = async (roomId: string, currentState
         nextState.gambleState = resolveResult.gambleState;
     }
 
+
     // Clear event overlay state, return to playing
     nextState.currentEvent = null;
     nextState.pendingEvent = null;
     nextState.status = 'playing';
+
+    // Reset timer for the player whose turn it is now
+    nextState.turnStartTime = Date.now();
+    nextState.turnExtension = 'none';
+
 
     await updateDoc(doc(db, 'rooms', roomId), { gameState: nextState });
 

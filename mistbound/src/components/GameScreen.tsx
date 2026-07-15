@@ -68,7 +68,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
         if (currentUser.uid === gameState.hostId || (gameState.players[0].id === currentUser.uid && !gameState.players.find(p => p.id === gameState.hostId)?.connected)) {
             const timer = setTimeout(async () => {
                 await triggerSpecialEventResolution(roomId, gameState);
-            }, 2000);
+            }, 3000);
             return () => clearTimeout(timer);
         }
     } else if (gameState.status !== 'event') {
