@@ -4,68 +4,70 @@ export type PlayerId = string;
 // The types of system events
 export type SpecialEvent = '通货膨胀' | '经济萧条' | '地下赌局' | '地产泡沫破裂' | null;
 
+export interface TokenCombo {
+  red: number;
+  blue: number;
+}
+
 export interface Player {
   id: PlayerId;
   name: string;
-  email: string; // Used for domain verification
+  email: string;
   avatarUrl: string;
   isBot: boolean;
-  wallet: {
-    red: number;
-    blue: number;
-  };
+  wallet: TokenCombo;
   connected: boolean;
 }
 
 export interface Territory {
   id: NodeId;
-  baseValue: number; // Initially set, e.g., 8-25
-  currentPrice: number; // Doubles upon each purchase
-  ownerId: PlayerId | null; // null if unowned
-  stolenCount: number; // Max 3, lock after that
-  locked: boolean; // Cannot be stolen anymore
-  // Record the original cost to refund the previous owner if stolen
-  lastPaid: {
-    red: number;
-    blue: number;
-  } | null;
+  name: string; // 中文名
+  baseValue: number;
+  currentPrice: number;
+  ownerId: PlayerId | null;
+  stolenCount: number;
+  locked: boolean;
+  lastPaid: TokenCombo | null;
 }
 
-// Global action log for the "left feed"
 export interface ActionLog {
   id: string;
   timestamp: number;
   message: string;
 }
 
-// Overall Game State
+export interface GambleState {
+  active: boolean;
+  bets: Record<PlayerId, number>; // How many total tokens bet (max 2)
+  pot: number;
+  winner: PlayerId | null;
+  phase: 'betting' | 'spinning' | 'resolved';
+}
+
 export interface GameState {
   status: 'waiting' | 'playing' | 'finished';
   winner: PlayerId | null;
   hostId: PlayerId;
 
-  // Players array, max 4
   players: Player[];
-
-  // Whose turn is it right now? (Index of `players` array)
   currentTurnIndex: number;
 
-  // The secret values (1 to 5)
   secretValues: {
-    x: number; // Red value
-    y: number; // Blue value
+    x: number;
+    y: number;
   };
 
-  // Territory state
   territories: Record<NodeId, Territory>;
 
-  // Current active event, if any
   currentEvent: SpecialEvent;
 
-  // Track rounds for special events (every 4 rounds)
-  roundCount: number;
+  // For the "Choose 1 of 2 cards" mechanic
+  pendingDrawCards: [TokenCombo, TokenCombo] | null;
 
-  // Action feed
+  // For gambling event
+  gambleState: GambleState | null;
+
+  roundCount: number;
   logs: ActionLog[];
 }
 

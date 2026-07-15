@@ -1,35 +1,33 @@
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import type { Room, GameState, Player } from '../types/game';
+import type { Room, GameState, Player, Territory } from '../types/game';
 
-// Helper to generate a random 6-character room code
 const generateRoomId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
-// Default Map Generation (Static Topology as per rules)
+// Default Map Generation (Static Topology with Chinese Names)
 const generateInitialMap = () => {
-  // Rough example of 15-20 nodes.
-  // In a real scenario, connections (edges) would also be defined here or in a separate constant.
   const nodes = [
-    { id: 'start', baseValue: 8 },
-    { id: 'path1_a', baseValue: 10 },
-    { id: 'path1_b', baseValue: 12 },
-    { id: 'path2_a', baseValue: 10 },
-    { id: 'hub_mid', baseValue: 20 },
-    { id: 'path3_a', baseValue: 15 },
-    { id: 'path3_b', baseValue: 15 },
-    { id: 'hub_central', baseValue: 25 },
-    { id: 'path4_a', baseValue: 12 },
-    { id: 'path5_a', baseValue: 10 },
-    { id: 'path5_b', baseValue: 12 },
-    { id: 'path6_a', baseValue: 10 },
-    { id: 'hub_late', baseValue: 20 },
-    { id: 'end', baseValue: 8 }
+    { id: 'start', name: '大本营(起)', baseValue: 0 }, // no price
+    { id: 'path1_a', name: '蛮荒之地', baseValue: 10 },
+    { id: 'path1_b', name: '绿野仙踪', baseValue: 12 },
+    { id: 'path2_a', name: '风暴峭壁', baseValue: 10 },
+    { id: 'hub_mid', name: '中立要塞', baseValue: 20 },
+    { id: 'path3_a', name: '烈焰峡谷', baseValue: 15 },
+    { id: 'path3_b', name: '迷雾旷野', baseValue: 15 },
+    { id: 'hub_central', name: '中央枢纽', baseValue: 25 },
+    { id: 'path4_a', name: '冰封雪域', baseValue: 12 },
+    { id: 'path5_a', name: '幽暗密林', baseValue: 10 },
+    { id: 'path5_b', name: '死亡沼泽', baseValue: 12 },
+    { id: 'path6_a', name: '哀嚎深渊', baseValue: 10 },
+    { id: 'hub_late', name: '决战高地', baseValue: 20 },
+    { id: 'end', name: '敌军之冠(终)', baseValue: 0 } // no price
   ];
 
-  const territories: Record<string, any> = {};
+  const territories: Record<string, Territory> = {};
   nodes.forEach(node => {
     territories[node.id] = {
       id: node.id,
+      name: node.name,
       baseValue: node.baseValue,
       currentPrice: node.baseValue,
       ownerId: null,
@@ -46,13 +44,12 @@ export const createRoom = async (hostUser: any): Promise<string> => {
   const roomId = generateRoomId();
   const roomRef = doc(db, 'rooms', roomId);
 
-  // Generate hidden variables x and y (1 to 5)
   const x = Math.floor(Math.random() * 5) + 1;
   const y = Math.floor(Math.random() * 5) + 1;
 
   const hostPlayer: Player = {
     id: hostUser.uid,
-    name: hostUser.displayName || 'Player 1',
+    name: hostUser.displayName || '玩家 1',
     email: hostUser.email,
     avatarUrl: hostUser.photoURL || '',
     isBot: false,
@@ -69,12 +66,14 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     secretValues: { x, y },
     territories: generateInitialMap(),
     currentEvent: null,
+    pendingDrawCards: null,
+    gambleState: null,
     roundCount: 0,
     logs: [
       {
         id: Date.now().toString(),
         timestamp: Date.now(),
-        message: `房间创建成功。等待其他玩家加入... / Room created. Waiting for players...`
+        message: `战局创建完毕，等待其他指挥官加入...`
       }
     ]
   };
@@ -94,27 +93,26 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
   const roomSnap = await getDoc(roomRef);
 
   if (!roomSnap.exists()) {
-    throw new Error('房间不存在 / Room does not exist');
+    throw new Error('未找到该战局');
   }
 
   const roomData = roomSnap.data() as Room;
 
   if (roomData.gameState.status !== 'waiting') {
-    throw new Error('游戏已开始 / Game has already started');
+    throw new Error('战斗已打响，无法加入');
   }
 
   if (roomData.gameState.players.length >= 4) {
-    throw new Error('房间已满 / Room is full');
+    throw new Error('战局已满员');
   }
 
-  // Check if user is already in the room
   if (roomData.gameState.players.find(p => p.id === user.uid)) {
-    return; // Already joined
+    return;
   }
 
   const newPlayer: Player = {
     id: user.uid,
-    name: user.displayName || `Player ${roomData.gameState.players.length + 1}`,
+    name: user.displayName || `玩家 ${roomData.gameState.players.length + 1}`,
     email: user.email,
     avatarUrl: user.photoURL || '',
     isBot: false,
@@ -127,7 +125,7 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
     'gameState.logs': arrayUnion({
       id: Date.now().toString(),
       timestamp: Date.now(),
-      message: `${newPlayer.name} 加入了房间。`
+      message: `${newPlayer.name} 已连线并加入战局。`
     })
   });
 };
@@ -140,17 +138,17 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
     const roomData = roomSnap.data() as Room;
 
     if (roomData.gameState.hostId !== hostId) {
-        throw new Error('只有房主可以添加人机 / Only host can add bots');
+        throw new Error('指挥权限不足（仅限房主）');
     }
 
     if (roomData.gameState.players.length >= 4) {
-        throw new Error('房间已满 / Room is full');
+        throw new Error('战局已满员');
     }
 
     const botCount = roomData.gameState.players.filter(p => p.isBot).length;
     const botPlayer: Player = {
         id: `bot_${Date.now()}`,
-        name: `AI 代理 ${botCount + 1}`,
+        name: `AI 僚机 ${botCount + 1}`,
         email: 'bot@system.local',
         avatarUrl: '',
         isBot: true,
@@ -163,7 +161,7 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
         'gameState.logs': arrayUnion({
           id: Date.now().toString(),
           timestamp: Date.now(),
-          message: `${botPlayer.name} 已被添加。`
+          message: `${botPlayer.name} 已激活。`
         })
     });
 };
@@ -176,7 +174,7 @@ export const startGame = async (roomId: string, hostId: string): Promise<void> =
     const roomData = roomSnap.data() as Room;
 
     if (roomData.gameState.hostId !== hostId) {
-        throw new Error('只有房主可以开始游戏 / Only host can start game');
+        throw new Error('指挥权限不足');
     }
 
     await updateDoc(roomRef, {
@@ -184,7 +182,7 @@ export const startGame = async (roomId: string, hostId: string): Promise<void> =
         'gameState.logs': arrayUnion({
             id: Date.now().toString(),
             timestamp: Date.now(),
-            message: `游戏开始！隐藏资源已生成。 / Game Started!`
+            message: `【系统提示】战斗正式打响！黑箱数据已生成。`
         })
     });
 }
