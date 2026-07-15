@@ -6,34 +6,64 @@ interface MapBoardProps {
   onNodeClick: (nodeId: NodeId) => void;
 }
 
+
 const nodeLayout: Record<NodeId, { cx: number; cy: number }> = {
   'start': { cx: 80, cy: 300 },
-  'path1_a': { cx: 250, cy: 120 },
-  'path1_b': { cx: 450, cy: 120 },
-  'path2_a': { cx: 280, cy: 300 },
-  'path3_a': { cx: 250, cy: 480 },
-  'path3_b': { cx: 450, cy: 480 },
-  'hub_mid': { cx: 550, cy: 250 },
-  'hub_central': { cx: 550, cy: 480 },
-  'path4_a': { cx: 700, cy: 150 },
-  'path5_a': { cx: 700, cy: 300 },
-  'path5_b': { cx: 850, cy: 300 },
-  'path6_a': { cx: 700, cy: 450 },
-  'hub_late': { cx: 950, cy: 300 },
+
+  // Front Line
+  'node_f1': { cx: 220, cy: 150 },
+  'node_f2': { cx: 220, cy: 250 },
+  'node_f3': { cx: 220, cy: 350 },
+  'node_f4': { cx: 220, cy: 450 },
+
+  // Mid Line 1
+  'node_m1': { cx: 400, cy: 100 },
+  'node_m2': { cx: 400, cy: 200 },
+  'node_m3': { cx: 400, cy: 300 },
+  'node_m4': { cx: 400, cy: 400 },
+  'node_m5': { cx: 400, cy: 500 },
+
+  // Mid Line 2
+  'node_m6': { cx: 620, cy: 150 },
+  'node_m7': { cx: 620, cy: 250 },
+  'node_m8': { cx: 620, cy: 350 },
+  'node_m9': { cx: 620, cy: 450 },
+
+  // Back Line
+  'node_b1': { cx: 850, cy: 100 },
+  'node_b2': { cx: 850, cy: 200 },
+  'node_b3': { cx: 850, cy: 300 },
+  'node_b4': { cx: 850, cy: 400 },
+  'node_b5': { cx: 850, cy: 500 },
+
   'end': { cx: 1080, cy: 300 }
 };
 
-// More complex cross-connections
+// Expanded Edges
 const mapEdges = [
-  ['start', 'path1_a'], ['start', 'path2_a'], ['start', 'path3_a'],
-  ['path1_a', 'path1_b'], ['path1_b', 'hub_mid'], ['path1_b', 'path4_a'],
-  ['path2_a', 'hub_mid'], ['path2_a', 'path3_b'],
-  ['path3_a', 'path3_b'], ['path3_b', 'hub_central'],
-  ['hub_mid', 'path4_a'], ['hub_mid', 'path5_a'], ['hub_mid', 'hub_central'],
-  ['path4_a', 'hub_late'], ['path4_a', 'path5_b'],
-  ['path5_a', 'path5_b'], ['path5_b', 'hub_late'],
-  ['hub_central', 'path6_a'], ['path6_a', 'hub_late'], ['path6_a', 'path5_b'],
-  ['hub_late', 'end']
+  ['start', 'node_f1'], ['start', 'node_f2'], ['start', 'node_f3'], ['start', 'node_f4'],
+
+  ['node_f1', 'node_f2'], ['node_f1', 'node_m1'], ['node_f1', 'node_m2'],
+  ['node_f2', 'node_f3'], ['node_f2', 'node_m2'], ['node_f2', 'node_m3'],
+  ['node_f3', 'node_f4'], ['node_f3', 'node_m3'], ['node_f3', 'node_m4'],
+  ['node_f4', 'node_m4'], ['node_f4', 'node_m5'],
+
+  ['node_m1', 'node_m2'], ['node_m1', 'node_m6'],
+  ['node_m2', 'node_m3'], ['node_m2', 'node_m6'], ['node_m2', 'node_m7'],
+  ['node_m3', 'node_m4'], ['node_m3', 'node_m7'], ['node_m3', 'node_m8'],
+  ['node_m4', 'node_m5'], ['node_m4', 'node_m8'], ['node_m4', 'node_m9'],
+  ['node_m5', 'node_m9'],
+
+  ['node_m6', 'node_m7'], ['node_m6', 'node_b1'], ['node_m6', 'node_b2'],
+  ['node_m7', 'node_m8'], ['node_m7', 'node_b2'], ['node_m7', 'node_b3'],
+  ['node_m8', 'node_m9'], ['node_m8', 'node_b3'], ['node_m8', 'node_b4'],
+  ['node_m9', 'node_b4'], ['node_m9', 'node_b5'],
+
+  ['node_b1', 'node_b2'], ['node_b1', 'end'],
+  ['node_b2', 'node_b3'], ['node_b2', 'end'],
+  ['node_b3', 'node_b4'], ['node_b3', 'end'],
+  ['node_b4', 'node_b5'], ['node_b4', 'end'],
+  ['node_b5', 'end']
 ];
 
 const playerColors = ['#8B0000', '#00008B', '#006400', '#DAA520']; // Dark Red, Dark Blue, Dark Green, Goldenrod
