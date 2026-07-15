@@ -1,44 +1,42 @@
 import type { Territory, Player, TokenCombo } from '../types/game';
 
 // Helper to generate a single valid combo based on B
-const generateSingleCombo = (B: number): TokenCombo => {
-  if (B <= 4) {
-    const combos = [
-      { red: 3, blue: 2 }, { red: 2, blue: 3 }, { red: 4, blue: 0 },
-      { red: 0, blue: 4 }, { red: 5, blue: 0 }, { red: 0, blue: 5 },
-      { red: 4, blue: 1 }, { red: 1, blue: 4 }
-    ];
-    return combos[Math.floor(Math.random() * combos.length)];
-  } else if (B >= 5 && B <= 7) {
-    const combos = [
-      { red: 1, blue: 1 }, { red: 2, blue: 1 }, { red: 1, blue: 2 },
-      { red: 2, blue: 0 }, { red: 0, blue: 2 }, { red: 3, blue: 0 },
-      { red: 0, blue: 3 }
-    ];
-    return combos[Math.floor(Math.random() * combos.length)];
-  } else {
-    const combos = [
-      { red: 1, blue: 0 }, { red: 0, blue: 1 }, { red: 1, blue: 1 },
-      { red: 2, blue: 0 }, { red: 0, blue: 2 }
-    ];
-    return combos[Math.floor(Math.random() * combos.length)];
-  }
-};
+// Action 1: Earn Money now generates TWO options
 
 // Action 1: Earn Money now generates TWO options
 export const earnMoneyOptions = (x: number, y: number): [TokenCombo, TokenCombo] => {
   const B = x + y;
-  const combo1 = generateSingleCombo(B);
-  let combo2 = generateSingleCombo(B);
 
-  // Try to make them different if possible
-  let attempts = 0;
-  while (combo1.red === combo2.red && combo1.blue === combo2.blue && attempts < 5) {
-      combo2 = generateSingleCombo(B);
-      attempts++;
+  if (B <= 4) {
+      // Big pool: 4-5 tokens. Complementary options.
+      const pool = [
+          [{ red: 4, blue: 0 }, { red: 1, blue: 3 }],
+          [{ red: 0, blue: 4 }, { red: 3, blue: 1 }],
+          [{ red: 3, blue: 2 }, { red: 2, blue: 3 }],
+          [{ red: 2, blue: 2 }, { red: 4, blue: 1 }],
+          [{ red: 1, blue: 4 }, { red: 5, blue: 0 }]
+      ];
+      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
+  } else if (B >= 5 && B <= 7) {
+      // Standard pool: 2-3 tokens. Complementary options.
+      const pool = [
+          [{ red: 2, blue: 0 }, { red: 0, blue: 3 }],
+          [{ red: 0, blue: 2 }, { red: 3, blue: 0 }],
+          [{ red: 1, blue: 2 }, { red: 2, blue: 1 }],
+          [{ red: 2, blue: 0 }, { red: 1, blue: 1 }],
+          [{ red: 1, blue: 1 }, { red: 0, blue: 2 }]
+      ];
+      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
+  } else {
+      // Tight pool: 1-2 tokens. Complementary options.
+      const pool = [
+          [{ red: 2, blue: 0 }, { red: 0, blue: 2 }],
+          [{ red: 1, blue: 0 }, { red: 0, blue: 1 }],
+          [{ red: 1, blue: 0 }, { red: 1, blue: 1 }],
+          [{ red: 0, blue: 1 }, { red: 1, blue: 1 }]
+      ];
+      return pool[Math.floor(Math.random() * pool.length)] as [TokenCombo, TokenCombo];
   }
-
-  return [combo1, combo2];
 };
 
 export interface BidResult {

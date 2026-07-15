@@ -16,7 +16,7 @@ export interface Player {
   isBot: boolean;
   wallet: TokenCombo;
   connected: boolean;
-  lastPing: number; // For heartbeat disconnect detection
+
 }
 
 export interface Territory {
@@ -67,6 +67,10 @@ export interface GameState {
 
   roundCount: number;
   logs: ActionLog[];
+
+  turnStartTime: number;
+  turnExtension: 'none' | 'pending' | 'granted';
+  turnExtensionTime: number;
 }
 
 export interface Room {

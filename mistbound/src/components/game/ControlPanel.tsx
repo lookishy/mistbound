@@ -41,7 +41,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               : 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed'
           }`}
         >
-          [A] 呼叫后勤补给
+          呼叫后勤补给
         </button>
 
         <hr className="border-[#5C4033] my-4" />

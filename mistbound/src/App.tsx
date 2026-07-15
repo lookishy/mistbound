@@ -4,7 +4,7 @@ import { GameScreen } from './components/GameScreen';
 import { db } from './services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { createRoom, joinRoom, addBot, startGame } from './services/room';
-import { executePlayerAction, updatePlayerPing, checkAndKickDisconnectedPlayers } from './engine/executor';
+import { executePlayerAction, checkTurnTimeout } from './engine/executor';
 import type { GameState, Room } from './types/game';
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
   useEffect(() => {
     if (!roomId || !gameState || !user) return;
     const interval = setInterval(() => {
-       updatePlayerPing(roomId, gameState, user.uid);
+
     }, 10000);
     return () => clearInterval(interval);
   }, [roomId, gameState, user]);
@@ -42,7 +42,7 @@ function App() {
     if (gameState.hostId !== user.uid) return; // Only host checks
 
     const interval = setInterval(() => {
-       checkAndKickDisconnectedPlayers(roomId, gameState, user.uid);
+       checkTurnTimeout(roomId, gameState, user.uid);
     }, 15000);
     return () => clearInterval(interval);
   }, [roomId, gameState, user]);
