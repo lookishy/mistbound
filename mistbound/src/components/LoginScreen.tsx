@@ -37,17 +37,18 @@ export const LoginScreen: React.FC<{ onLogin: (user: any) => void }> = ({ onLogi
           * 仅限 @tsunjin.edu.my 域名用户</p>
 
 
+
         <div className="mt-8 pt-6 border-t border-gray-700 text-sm text-gray-400">
            <h3 className="font-bold text-yellow-500 mb-2">作战规则简介：</h3>
            <ul className="list-disc pl-5 space-y-2">
              <li><span className="text-white">战役目标：</span>建立从起点到终点的连续防线。</li>
              <li><span className="text-white">最高机密：</span>系统每局暗中赋予红蓝晶 1-5 之间不同的价值。</li>
              <li><span className="text-white">防线争夺：</span>投入资源价值大等于标价即可占领，原主获全额退款。</li>
-             <li><span className="text-yellow-400">锁定机制：</span>1-4人局上限3次易主；5-8人局上限6次易主。</li>
+             <li><span className="text-yellow-400">锁定机制：</span>当房间人数为 1 至 4 人时，每个领地最多允许易主 3 次；当房间人数为 5 至 8 人时，每个领地最多允许易主 6 次，达到上限后领地将永久锁定。</li>
            </ul>
         </div>
-        <p className="mt-8 text-xs text-blue-500/50 animate-pulse text-center">Initializing Mistbound Network... v1.0.0
-        </p>
+
+
 
         {error && (
           <div className="mt-6 p-4 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm text-center">
