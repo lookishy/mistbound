@@ -97,12 +97,18 @@ export const runBotTurn = (gameState: GameState): BotActionResult | null => {
               }
           }
 
+
           territory.ownerId = botNext.id;
           territory.stolenCount += 1;
-          if (territory.stolenCount >= 3) {
+          territory.ownerHistory = territory.ownerHistory || [];
+          territory.ownerHistory.push(botNext.id);
+
+          const maxStolen = nextState.players.length <= 4 ? 3 : 6;
+          if (territory.stolenCount >= maxStolen) {
               territory.locked = true;
           }
           territory.currentPrice = bidResult.newPrice!;
+
           territory.lastPaid = { red: optimalBidRed, blue: optimalBidBlue };
 
           logMessage = bidResult.message;

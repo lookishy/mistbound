@@ -146,7 +146,34 @@ export const MapBoard: React.FC<MapBoardProps> = ({ gameState, onNodeClick }) =>
                   filter={glowEnabled ? "url(#glow)" : undefined}
                 />
 
+
+                {/* Owner History Dots */}
+                {!isBase && territory.ownerHistory && territory.ownerHistory.length > 0 && (
+                  <g>
+                    {territory.ownerHistory.map((hId, hIdx) => {
+                       const hPlayerIdx = gameState.players.findIndex(p => p.id === hId);
+                       const dotColor = hPlayerIdx !== -1 ? playerColors[hPlayerIdx] : '#555';
+                       // Center them below the node
+                       const total = territory.ownerHistory.length;
+                       const spacing = 8;
+                       const startX = pos.cx - ((total - 1) * spacing) / 2;
+                       return (
+                         <circle
+                           key={`hist-${id}-${hIdx}`}
+                           cx={startX + hIdx * spacing}
+                           cy={pos.cy + 25}
+                           r="3"
+                           fill={dotColor}
+                           stroke="#000"
+                           strokeWidth="1"
+                         />
+                       );
+                    })}
+                  </g>
+                )}
+
                 {/* Node Name */}
+
                 <text
                   x={pos.cx}
                   y={pos.cy - (isBase ? 45 : 38)}
