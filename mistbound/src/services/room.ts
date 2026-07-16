@@ -48,6 +48,7 @@ const generateInitialMap = () => {
       currentPrice: node.baseValue,
       ownerId: null,
       stolenCount: 0,
+      ownerHistory: [],
       locked: false,
       lastPaid: null
     };
@@ -123,7 +124,7 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
     throw new Error('战斗已打响，无法加入');
   }
 
-  if (roomData.gameState.players.length >= 4) {
+  if (roomData.gameState.players.length >= 8) {
     throw new Error('战局已满员');
   }
 
@@ -163,7 +164,7 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
         throw new Error('指挥权限不足（仅限房主）');
     }
 
-    if (roomData.gameState.players.length >= 4) {
+    if (roomData.gameState.players.length >= 8) {
         throw new Error('战局已满员');
     }
 

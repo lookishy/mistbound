@@ -36,15 +36,26 @@ const ExtensionModal = ({ onConfirm }: { onConfirm: () => void }) => (
 );
 
 
-const WinModal = ({ winnerName, onReturn }: { winnerName: string, onReturn: () => void }) => (
+
+const WinModal = ({ winnerName, onReturn, secretX, secretY }: { winnerName: string, onReturn: () => void, secretX: number, secretY: number }) => (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
       <div className="earth-panel p-12 rounded-2xl border-4 border-yellow-600 max-w-2xl w-full relative shadow-[0_0_80px_rgba(218,165,32,0.8)] text-center animate-[pulse_3s_ease-in-out_infinite]">
         <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-300 mb-6 drop-shadow-[0_0_10px_rgba(255,215,0,0.8)]">
           战线贯通，雾境主宰！
         </h2>
-        <div className="text-3xl font-bold text-white mb-10">
+
+        <div className="text-3xl font-bold text-white mb-8">
           最终胜利者：<span className="text-yellow-400">{winnerName}</span>
         </div>
+
+        <div className="bg-black/50 border border-[#5C4033] p-6 rounded-lg mb-10">
+           <h3 className="text-xl font-bold text-red-400 mb-4">本局终极谜底揭晓</h3>
+           <div className="flex justify-center gap-12 text-2xl font-bold">
+              <div className="text-red-500">红晶真实价值 = {secretX}</div>
+              <div className="text-blue-500">蓝晶真实价值 = {secretY}</div>
+           </div>
+        </div>
+
         <button
           onClick={onReturn}
           className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-4 px-12 rounded-lg transition-all border-2 border-yellow-500 text-xl shadow-[0_0_20px_rgba(218,165,32,0.5)]"
@@ -177,12 +188,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
 
       {isRuleModalOpen && <RuleModal onClose={() => setIsRuleModalOpen(false)} />}
 
+
       {gameState.status === 'finished' && gameState.winner && (
           <WinModal
             winnerName={gameState.players.find(p => p.id === gameState.winner)?.name || '未知玩家'}
+            secretX={gameState.secretValues.x}
+            secretY={gameState.secretValues.y}
             onReturn={() => window.location.reload()}
           />
       )}
+
 
 
       {gameState.turnExtension === 'pending' && isMyTurn && (

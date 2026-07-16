@@ -228,12 +228,18 @@ export const executePlayerAction = async (
                 }
             }
 
+
             target.ownerId = player.id;
             target.stolenCount += 1;
-            if (target.stolenCount >= 3) {
+            target.ownerHistory = target.ownerHistory || [];
+            target.ownerHistory.push(player.id);
+
+            const maxStolen = nextState.players.length <= 4 ? 3 : 6;
+            if (target.stolenCount >= maxStolen) {
                 target.locked = true;
             }
             target.currentPrice = bidResult.newPrice!;
+
             target.lastPaid = { red: params.red, blue: params.blue };
 
             logMessage = bidResult.message;

@@ -26,6 +26,7 @@ export interface Territory {
   currentPrice: number;
   ownerId: PlayerId | null;
   stolenCount: number;
+  ownerHistory: PlayerId[];
   locked: boolean;
   lastPaid: TokenCombo | null;
 }
