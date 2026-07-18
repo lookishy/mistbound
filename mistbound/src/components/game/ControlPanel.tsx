@@ -18,7 +18,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     <div className="h-full earth-panel rounded p-4 flex flex-col font-mono relative">
       <div className="mb-4">
         <h3 className="text-gray-400 text-xs mb-1 uppercase">【军备库】</h3>
-        <div className="flex gap-4">
+        <div className="flex gap-2">
           <div className="bg-red-900/30 border border-red-800 rounded p-2 flex-1 text-center shadow-[inset_0_0_10px_rgba(139,0,0,0.5)]">
             <span className="text-red-500 font-bold text-xl">{currentPlayer.wallet.red}</span>
             <span className="text-red-500/50 text-xs block">红晶</span>
@@ -26,6 +26,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="bg-blue-900/30 border border-blue-800 rounded p-2 flex-1 text-center shadow-[inset_0_0_10px_rgba(0,0,139,0.5)]">
             <span className="text-blue-500 font-bold text-xl">{currentPlayer.wallet.blue}</span>
             <span className="text-blue-500/50 text-xs block">蓝晶</span>
+          </div>
+          <div className="bg-green-900/30 border border-green-800 rounded p-2 flex-1 text-center shadow-[inset_0_0_10px_rgba(0,139,0,0.5)]">
+            <span className="text-green-500 font-bold text-xl">{currentPlayer.wallet.green}</span>
+            <span className="text-green-500/50 text-xs block">绿晶</span>
           </div>
         </div>
       </div>

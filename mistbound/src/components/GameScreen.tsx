@@ -9,6 +9,7 @@ import { EventOverlay } from './game/modals/EventOverlay';
 import { GambleModal } from './game/modals/GambleModal';
 import { BidModal } from './game/modals/BidModal';
 import { RuleModal } from './game/modals/RuleModal'; // New Rule Modal
+import { SpyModal } from './game/modals/SpyModal';
 import { audio } from '../services/audio';
 import { submitGambleBet, triggerGambleSpin, triggerSpecialEventResolution, extendTurnTime, checkTurnTimeout } from '../engine/executor';
 
@@ -16,7 +17,7 @@ interface GameScreenProps {
   roomId: string;
   gameState: GameState | null;
   currentUser: any;
-  onActionComplete?: (actionType: 'earn_init' | 'earn_confirm' | 'bid', params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }) => void;
+  onActionComplete?: (actionType: 'earn_init' | 'earn_cancel' | 'earn_confirm' | 'bid' | 'spy_action', params?: any) => void;
 }
 
 
@@ -70,56 +71,72 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [spyTargetId, setSpyTargetId] = useState<string | null>(null);
+  const [spyLogId, setSpyLogId] = useState<string | null>(null);
 
   const [prevTurn, setPrevTurn] = useState<number | null>(null);
   const [prevEvent, setPrevEvent] = useState<string | null>(null);
 
-  if (!gameState) {
-    return <div className="text-white flex items-center justify-center h-screen">系统连线中...</div>;
-  }
+  const myPlayerIndex = gameState?.players.findIndex((p: any) => p.id === currentUser.uid) ?? -1;
+  const myPlayer = gameState?.players[myPlayerIndex];
+  const isMyTurn = gameState?.currentTurnIndex === myPlayerIndex && gameState?.status === 'playing';
 
-  const myPlayerIndex = gameState.players.findIndex((p: any) => p.id === currentUser.uid);
-  const myPlayer = gameState.players[myPlayerIndex];
-  const isMyTurn = gameState.currentTurnIndex === myPlayerIndex && gameState.status === 'playing';
+  // Extract specific properties for dependency arrays
+  const status = gameState?.status;
+  const currentEvent = gameState?.currentEvent;
+  const hostId = gameState?.hostId;
+  const players = gameState?.players || [];
+  const currentTurnIndex = gameState?.currentTurnIndex ?? -1;
+  const gambleStateActive = gameState?.gambleState?.active;
 
   // Audio Hooks
   useEffect(() => {
-    if (gameState.currentTurnIndex !== prevTurn) {
-        if (isMyTurn && !gameState.gambleState?.active) audio.playTurnStart();
-        setPrevTurn(gameState.currentTurnIndex);
+    if (gameState && currentTurnIndex !== prevTurn) {
+        if (isMyTurn && !gambleStateActive) audio.playTurnStart();
+        setPrevTurn(currentTurnIndex);
     }
-  }, [gameState.currentTurnIndex, isMyTurn, prevTurn, gameState.gambleState]);
+  }, [currentTurnIndex, isMyTurn, prevTurn, gambleStateActive, gameState]);
+
+  const currentEventStr = currentEvent || '';
+  const currentUserId = currentUser?.uid || '';
+  const firstPlayerId = players[0]?.id || '';
+  const isHostConnected = !!players.find(p => p.id === hostId)?.connected;
 
   // Event Overlay Hook - 2 seconds auto-hide logic AND resolve event
   useEffect(() => {
-    if (gameState.status === 'event' && gameState.currentEvent && gameState.currentEvent !== prevEvent) {
+    if (!gameState) return;
+    if (status === 'event' && currentEventStr && currentEventStr !== prevEvent) {
         audio.playEventTrigger();
-        setPrevEvent(gameState.currentEvent);
+        setPrevEvent(currentEventStr);
 
-        if (currentUser.uid === gameState.hostId || (gameState.players[0].id === currentUser.uid && !gameState.players.find(p => p.id === gameState.hostId)?.connected)) {
+        if (currentUserId === hostId || (firstPlayerId === currentUserId && !isHostConnected)) {
             const timer = setTimeout(async () => {
                 await triggerSpecialEventResolution(roomId, gameState);
             }, 3000);
             return () => clearTimeout(timer);
         }
-    } else if (gameState.status !== 'event') {
+    } else if (status !== 'event') {
         setPrevEvent(null);
     }
-  }, [gameState.status, gameState.currentEvent, prevEvent, roomId, currentUser.uid, gameState.hostId, gameState.players]);
+  }, [status, currentEventStr, prevEvent, roomId, currentUserId, hostId, firstPlayerId, isHostConnected, gameState]);
 
 
 
   // Timeout check loop
   useEffect(() => {
-    if (gameState.status !== 'playing' || !currentUser) return;
+    if (!gameState || status !== 'playing' || !currentUserId) return;
 
     // Host checks timeouts
     const interval = setInterval(() => {
-      checkTurnTimeout(roomId, gameState, currentUser.uid);
+      checkTurnTimeout(roomId, gameState, currentUserId);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState, roomId, currentUser]);
+  }, [status, roomId, currentUserId, gameState]);
+
+  if (!gameState || !myPlayer) {
+    return <div className="text-white flex items-center justify-center h-screen">系统连线中...</div>;
+  }
 
   const handleExtensionConfirm = () => {
       extendTurnTime(roomId, gameState, currentUser.uid);
@@ -128,6 +145,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
   const handleEarnMoney = () => {
     if (!isMyTurn || !onActionComplete) return;
     onActionComplete('earn_init');
+  };
+
+  const handleDrawCancel = () => {
+    if (!isMyTurn || !onActionComplete) return;
+    onActionComplete('earn_cancel');
   };
 
   const handleDrawSelect = (combo: TokenCombo) => {
@@ -141,12 +163,32 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
       setIsBidModalOpen(true);
   };
 
-  const handleBidConfirm = (red: number, blue: number) => {
+  const handleBidConfirm = (red: number, blue: number, green: number) => {
     if (!isMyTurn || !selectedNode || !onActionComplete) return;
     audio.playBidSuccess();
-    onActionComplete('bid', { targetId: selectedNode, red, blue });
+    onActionComplete('bid', { targetId: selectedNode, red, blue, green });
     setIsBidModalOpen(false);
     setSelectedNode(null);
+  };
+
+  const handleSpyConfirm = (red: number, blue: number, green: number) => {
+    if (!onActionComplete) return;
+    try {
+        if (spyTargetId) {
+            onActionComplete('spy_action', { spyType: 'wallet', spyTargetId, red, blue, green });
+        } else if (spyLogId) {
+            onActionComplete('spy_action', { spyType: 'log', logId: spyLogId, red, blue, green });
+        }
+    } catch (e: any) {
+        alert(e.message);
+    }
+    setSpyTargetId(null);
+    setSpyLogId(null);
+  };
+
+  const handleSpyCancel = () => {
+    setSpyTargetId(null);
+    setSpyLogId(null);
   };
 
   const handleGambleBet = async (amount: number) => {
@@ -159,12 +201,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
   };
 
   return (
-    <div className="flex flex-col h-screen earth-bg p-4 gap-4 box-border relative">
+    <div className="flex flex-col min-h-screen earth-bg p-4 gap-4 box-border relative overflow-y-auto overflow-x-hidden">
 
       {gameState.status === 'event' && <EventOverlay eventTitle={gameState.currentEvent} />}
 
       {gameState.pendingDrawCards && isMyTurn && gameState.status !== 'event' && (
-         <DrawModal options={gameState.pendingDrawCards} onSelect={handleDrawSelect} />
+         <DrawModal options={gameState.pendingDrawCards} onSelect={handleDrawSelect} onCancel={handleDrawCancel} />
       )}
 
       {gameState.gambleState?.active && gameState.status !== 'event' && (
@@ -182,6 +224,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
             wallet={myPlayer.wallet}
             onConfirm={handleBidConfirm}
             onCancel={() => { setIsBidModalOpen(false); setSelectedNode(null); }}
+         />
+      )}
+
+      {(spyTargetId || spyLogId) && (
+         <SpyModal
+            wallet={myPlayer.wallet}
+            hasUsedSpy={gameState.spyUsed}
+            targetName={spyTargetId ? (gameState.players.find(p => p.id === spyTargetId)?.name || '未知目标') : (gameState.logs.find(l => l.id === spyLogId)?.targetName || '历史交易')}
+            onConfirm={handleSpyConfirm}
+            onCancel={handleSpyCancel}
          />
       )}
 
@@ -234,7 +286,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
       <div className="flex-1 flex gap-4 min-h-0">
         {/* Left Column: Action Feed */}
         <div className="w-64 flex-shrink-0">
-          <ActionFeed logs={gameState.logs} />
+          <ActionFeed
+            logs={gameState.logs}
+            myPlayerId={myPlayer.id}
+            onLogClick={(logId) => { setSpyLogId(logId); setSpyTargetId(null); }}
+          />
         </div>
 
         {/* Center: Map Board */}
@@ -254,7 +310,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ roomId, gameState, curre
 
       {/* Bottom Area: Players List */}
       <div className="h-28 flex-shrink-0 earth-panel rounded">
-        <PlayerList players={gameState.players} currentTurnIndex={gameState.currentTurnIndex} />
+        <PlayerList
+          players={gameState.players}
+          currentTurnIndex={gameState.currentTurnIndex}
+          myPlayerId={myPlayer.id}
+          onAvatarClick={(playerId) => { setSpyTargetId(playerId); setSpyLogId(null); }}
+        />
       </div>
     </div>
   );

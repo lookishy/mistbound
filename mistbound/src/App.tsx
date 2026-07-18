@@ -98,7 +98,7 @@ function App() {
          </div>
 
          {/* Rules Area */}
-         <div className="w-1/2 h-screen border-l-2 border-[#5C4033] p-10 overflow-y-auto bg-black/40 z-10 scrollbar-thin scrollbar-thumb-[#5C4033]">
+         <div className="w-1/2 min-h-screen border-l-2 border-[#5C4033] p-10 overflow-y-auto bg-black/40 z-10 scrollbar-thin scrollbar-thumb-[#5C4033]">
             <h2 className="text-3xl font-black text-yellow-500 mb-6 border-b border-[#5C4033] pb-2">作战守则</h2>
 
             <div className="space-y-6 text-gray-300 leading-relaxed">
@@ -148,7 +148,7 @@ function App() {
          <div className="earth-panel p-6 rounded-lg w-[400px]">
             <h2 className="text-gray-400 border-b border-[#5C4033] pb-2 mb-4 font-bold flex justify-between">
               <span>已连线指挥官</span>
-              <span>{gameState.players.length}/4</span>
+              <span>{gameState.players.length}/8</span>
             </h2>
             <ul className="space-y-3 mb-8">
               {gameState.players.map(p => (
@@ -165,7 +165,7 @@ function App() {
               <div className="flex flex-col gap-4">
                 <button
                   onClick={() => addBot(roomId, user.uid)}
-                  disabled={gameState.players.length >= 4}
+                  disabled={gameState.players.length >= 8}
                   className="border-2 border-blue-900 hover:bg-blue-900/50 text-blue-400 py-3 rounded disabled:opacity-50 font-bold transition-all"
                 >
                   分配 AI 僚机

@@ -143,7 +143,11 @@ export const triggerBotTurn = async (roomId: string, currentState: GameState) =>
         nextState.logs.push({
             id: Date.now().toString(),
             timestamp: Date.now(),
-            message: botResult.actionLogMessage
+            message: botResult.actionLogMessage,
+            isBid: botResult.isBid,
+            buyerId: botResult.buyerId,
+            targetName: botResult.targetName,
+            cost: botResult.cost
         });
 
         const botPlayer = currentState.players[currentState.currentTurnIndex];
@@ -180,8 +184,17 @@ export const triggerBotTurn = async (roomId: string, currentState: GameState) =>
 export const executePlayerAction = async (
     roomId: string,
     currentState: GameState,
-    actionType: 'earn_init' | 'earn_confirm' | 'bid',
-    params?: { targetId?: string, red?: number, blue?: number, chosenCombo?: TokenCombo }
+    actionType: 'earn_init' | 'earn_cancel' | 'earn_confirm' | 'bid' | 'spy_action',
+    params?: {
+        targetId?: string;
+        red?: number;
+        blue?: number;
+        green?: number;
+        chosenCombo?: TokenCombo;
+        spyTargetId?: string;
+        spyType?: 'wallet' | 'log';
+        logId?: string;
+    }
 ) => {
     const nextState = JSON.parse(JSON.stringify(currentState)) as GameState;
     if (nextState.status !== 'playing') return;
@@ -191,8 +204,77 @@ export const executePlayerAction = async (
     let logMessage = '';
 
     if (actionType === 'earn_init') {
-        const options = earnMoneyOptions(nextState.secretValues.x, nextState.secretValues.y);
+        const options = earnMoneyOptions(nextState.secretValues.x, nextState.secretValues.y, nextState.secretValues.z);
         nextState.pendingDrawCards = options;
+        const roomRef = doc(db, 'rooms', roomId);
+        await updateDoc(roomRef, { gameState: nextState });
+        return;
+    }
+
+    if (actionType === 'earn_cancel') {
+        nextState.pendingDrawCards = null;
+        const roomRef = doc(db, 'rooms', roomId);
+        await updateDoc(roomRef, { gameState: nextState });
+        return;
+    }
+
+    if (actionType === 'spy_action' && params?.spyType) {
+        if (nextState.spyUsed) {
+             throw new Error('本回合已执行过间谍行动，无法再次执行。');
+        }
+
+        // Deduct spy cost
+        if (params.red !== undefined && params.blue !== undefined && params.green !== undefined) {
+             const costV = params.red * nextState.secretValues.x + params.blue * nextState.secretValues.y + params.green * nextState.secretValues.z;
+
+             if (player.wallet.red < params.red || player.wallet.blue < params.blue || player.wallet.green < params.green) {
+                 throw new Error('代币不足以支付情报费用！');
+             }
+
+             player.wallet.red -= params.red;
+             player.wallet.blue -= params.blue;
+             player.wallet.green -= params.green;
+
+             nextState.spyUsed = true; // Set used even if failed to penalize
+
+             if (costV < 5) {
+                 nextState.logs.push({
+                     id: Date.now().toString(),
+                     timestamp: Date.now(),
+                     message: `【情报失败】间谍行动经费不足 (支付总面值<5)，资源被没收，无法获取情报！`,
+                     privateTo: player.id
+                 });
+                 const roomRef = doc(db, 'rooms', roomId);
+                 await updateDoc(roomRef, { gameState: nextState });
+                 return; // Abort further execution so they don't get the intel
+             }
+        } else {
+             nextState.spyUsed = true;
+        }
+
+
+        if (params.spyType === 'wallet' && params.spyTargetId) {
+             const targetPlayer = nextState.players.find(p => p.id === params.spyTargetId);
+             if (targetPlayer) {
+                  nextState.logs.push({
+                      id: Date.now().toString(),
+                      timestamp: Date.now(),
+                      message: `【情报汇报】你派遣间谍成功窃取了 ${targetPlayer.name} 的资产情报：${targetPlayer.wallet.red}红、${targetPlayer.wallet.blue}蓝、${targetPlayer.wallet.green}绿。`,
+                      privateTo: player.id
+                  });
+             }
+        } else if (params.spyType === 'log' && params.logId) {
+             const targetLog = nextState.logs.find(l => l.id === params.logId);
+             if (targetLog && targetLog.cost) {
+                 nextState.logs.push({
+                      id: Date.now().toString(),
+                      timestamp: Date.now(),
+                      message: `【情报汇报】你派遣间谍解密了历史交易情报：${targetLog.buyerId} 夺取【${targetLog.targetName}】真实花费了 ${targetLog.cost.red}红、${targetLog.cost.blue}蓝、${targetLog.cost.green}绿。`,
+                      privateTo: player.id
+                  });
+             }
+        }
+
         const roomRef = doc(db, 'rooms', roomId);
         await updateDoc(roomRef, { gameState: nextState });
         return;
@@ -201,17 +283,23 @@ export const executePlayerAction = async (
     if (actionType === 'earn_confirm' && params?.chosenCombo) {
         player.wallet.red += params.chosenCombo.red;
         player.wallet.blue += params.chosenCombo.blue;
+        player.wallet.green += params.chosenCombo.green;
         nextState.pendingDrawCards = null;
-        logMessage = `${player.name} 选择了补给：获得 ${params.chosenCombo.red}红 ${params.chosenCombo.blue}蓝。`;
+        logMessage = `${player.name} 选择了补给：获得 ${params.chosenCombo.red}红 ${params.chosenCombo.blue}蓝 ${params.chosenCombo.green}绿。`;
     }
 
-    if (actionType === 'bid' && params?.targetId !== undefined && params?.red !== undefined && params?.blue !== undefined) {
+    let isBidSuccess = false;
+    let bidCost: TokenCombo | undefined = undefined;
+
+    if (actionType === 'bid' && params?.targetId !== undefined && params?.red !== undefined && params?.blue !== undefined && params?.green !== undefined) {
         const target = nextState.territories[params.targetId];
         const bidResult = evaluateBid(
             params.red,
             params.blue,
+            params.green,
             nextState.secretValues.x,
             nextState.secretValues.y,
+            nextState.secretValues.z,
             target,
             player
         );
@@ -219,12 +307,14 @@ export const executePlayerAction = async (
         if (bidResult.success) {
             player.wallet.red -= params.red;
             player.wallet.blue -= params.blue;
+            player.wallet.green -= params.green;
 
             if (bidResult.refund) {
                 const prevOwnerIndex = nextState.players.findIndex(p => p.id === bidResult.refund!.toPlayerId);
                 if (prevOwnerIndex !== -1) {
                     nextState.players[prevOwnerIndex].wallet.red += bidResult.refund!.red;
                     nextState.players[prevOwnerIndex].wallet.blue += bidResult.refund!.blue;
+                    nextState.players[prevOwnerIndex].wallet.green += bidResult.refund!.green;
                 }
             }
 
@@ -240,9 +330,11 @@ export const executePlayerAction = async (
             }
             target.currentPrice = bidResult.newPrice!;
 
-            target.lastPaid = { red: params.red, blue: params.blue };
+            target.lastPaid = { red: params.red, blue: params.blue, green: params.green };
 
             logMessage = bidResult.message;
+            isBidSuccess = true;
+            bidCost = { red: params.red, blue: params.blue, green: params.green };
         } else {
             logMessage = bidResult.message;
         }
@@ -253,6 +345,7 @@ export const executePlayerAction = async (
         nextState.winner = player.id;
         logMessage += `【前线急报】${player.name} 成功贯通战线，夺取最终胜利！`;
     } else {
+        nextState.spyUsed = false;
         nextState.currentTurnIndex = (currentTurnIndex + 1) % nextState.players.length;
         nextState.turnStartTime = Date.now();
         nextState.turnExtension = 'none';
@@ -270,7 +363,11 @@ export const executePlayerAction = async (
     nextState.logs.push({
         id: Date.now().toString(),
         timestamp: Date.now(),
-        message: logMessage
+        message: logMessage,
+        isBid: isBidSuccess,
+        buyerId: player.name,
+        targetName: actionType === 'bid' && params?.targetId ? nextState.territories[params.targetId].name : undefined,
+        cost: bidCost
     });
 
     const roomRef = doc(db, 'rooms', roomId);

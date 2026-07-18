@@ -41,11 +41,12 @@ const generateInitialMap = () => {
 
   const territories: Record<string, Territory> = {};
   nodes.forEach(node => {
+    const scaledBaseValue = Math.ceil(node.baseValue * 1.5);
     territories[node.id] = {
       id: node.id,
       name: node.name,
-      baseValue: node.baseValue,
-      currentPrice: node.baseValue,
+      baseValue: scaledBaseValue,
+      currentPrice: scaledBaseValue,
       ownerId: null,
       stolenCount: 0,
       ownerHistory: [],
@@ -63,6 +64,7 @@ export const createRoom = async (hostUser: any): Promise<string> => {
 
   const x = Math.floor(Math.random() * 5) + 1;
   const y = Math.floor(Math.random() * 5) + 1;
+  const z = Math.floor(Math.random() * 5) + 1;
 
   const hostPlayer: Player = {
     id: hostUser.uid,
@@ -70,7 +72,7 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     email: hostUser.email,
     avatarUrl: hostUser.photoURL || '',
     isBot: false,
-    wallet: { red: 0, blue: 0 },
+    wallet: { red: 0, blue: 0, green: 0 },
     connected: true,
 
   };
@@ -81,7 +83,8 @@ export const createRoom = async (hostUser: any): Promise<string> => {
     hostId: hostUser.uid,
     players: [hostPlayer],
     currentTurnIndex: 0,
-    secretValues: { x, y },
+    secretValues: { x, y, z },
+    spyUsed: false,
     territories: generateInitialMap(),
     currentEvent: null,
     pendingEvent: null,
@@ -138,7 +141,7 @@ export const joinRoom = async (roomId: string, user: any): Promise<void> => {
     email: user.email,
     avatarUrl: user.photoURL || '',
     isBot: false,
-    wallet: { red: 0, blue: 0 },
+    wallet: { red: 0, blue: 0, green: 0 },
     connected: true,
 
   };
@@ -175,7 +178,7 @@ export const addBot = async (roomId: string, hostId: string): Promise<void> => {
         email: 'bot@system.local',
         avatarUrl: '',
         isBot: true,
-        wallet: { red: 0, blue: 0 },
+        wallet: { red: 0, blue: 0, green: 0 },
         connected: true,
 
     };
