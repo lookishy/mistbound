@@ -5,6 +5,10 @@ import { mapGraph } from './winCondition';
 export interface BotActionResult {
   updatedGameState: GameState;
   actionLogMessage: string;
+  isBid?: boolean;
+  buyerId?: string;
+  targetName?: string;
+  cost?: any;
 }
 
 export const runBotTurn = (gameState: GameState): BotActionResult | null => {
@@ -46,33 +50,32 @@ export const runBotTurn = (gameState: GameState): BotActionResult | null => {
   let targetToBuy: string | null = null;
   let optimalBidRed = 0;
   let optimalBidBlue = 0;
+  let optimalBidGreen = 0;
+  let bidCostObj = undefined;
 
   for (const targetId of bestCandidates) {
       const territory = nextState.territories[targetId];
       const V = territory.currentPrice;
 
-      // We know x,y are bounded 1-5. Bot needs to guess or just try combinations it can afford.
-      // Bot assumes average value of 3 for x and y to make a safe bet, or just uses its actual knowledge if it has any (it doesn't, so it guesses).
-      // A more robust way: Bot tries to fulfill V assuming x=1, y=1 (worst case) to guarantee buy if it has enough.
-      // Or it just uses what it has and hopes it works.
-
-      // Let's make the bot "smart" by checking if its max possible contribution is >= V.
-      // Bot secret values are in nextState.secretValues (which bot theoretically shouldn't know, but we use it here to make it perfectly rational)
       const x = nextState.secretValues.x;
       const y = nextState.secretValues.y;
+      const z = nextState.secretValues.z;
 
-      let maxP = botNext.wallet.red * x + botNext.wallet.blue * y;
-      if (maxP >= V) {
-          // Find minimal combination
-          for (let r = 0; r <= botNext.wallet.red; r++) {
-              for (let b = 0; b <= botNext.wallet.blue; b++) {
-                  if (r === 0 && b === 0) continue;
-                  if (r * x + b * y >= V) {
-                      targetToBuy = targetId;
-                      optimalBidRed = r;
-                      optimalBidBlue = b;
-                      break;
+      let maxP = botNext.wallet.red * x + botNext.wallet.blue * y + botNext.wallet.green * z;
+      if (maxP >= V && botNext.wallet.red >= 1 && botNext.wallet.blue >= 1 && botNext.wallet.green >= 1) {
+          // Find minimal combination that includes at least 1 of each color
+          for (let r = 1; r <= botNext.wallet.red; r++) {
+              for (let b = 1; b <= botNext.wallet.blue; b++) {
+                  for (let g = 1; g <= botNext.wallet.green; g++) {
+                      if (r * x + b * y + g * z >= V) {
+                          targetToBuy = targetId;
+                          optimalBidRed = r;
+                          optimalBidBlue = b;
+                          optimalBidGreen = g;
+                          break;
+                      }
                   }
+                  if (targetToBuy) break;
               }
               if (targetToBuy) break;
           }
@@ -80,20 +83,24 @@ export const runBotTurn = (gameState: GameState): BotActionResult | null => {
       if (targetToBuy) break;
   }
 
+  let isBidSuccess = false;
+
   if (targetToBuy) {
       // Action B: Buy/Bid
       const territory = nextState.territories[targetToBuy];
-      const bidResult = evaluateBid(optimalBidRed, optimalBidBlue, nextState.secretValues.x, nextState.secretValues.y, territory, botNext);
+      const bidResult = evaluateBid(optimalBidRed, optimalBidBlue, optimalBidGreen, nextState.secretValues.x, nextState.secretValues.y, nextState.secretValues.z, territory, botNext);
 
       if (bidResult.success) {
           botNext.wallet.red -= optimalBidRed;
           botNext.wallet.blue -= optimalBidBlue;
+          botNext.wallet.green -= optimalBidGreen;
 
           if (bidResult.refund) {
               const prevOwnerIndex = nextState.players.findIndex(p => p.id === bidResult.refund!.toPlayerId);
               if (prevOwnerIndex !== -1) {
                   nextState.players[prevOwnerIndex].wallet.red += bidResult.refund!.red;
                   nextState.players[prevOwnerIndex].wallet.blue += bidResult.refund!.blue;
+                  nextState.players[prevOwnerIndex].wallet.green += bidResult.refund!.green;
               }
           }
 
@@ -109,23 +116,38 @@ export const runBotTurn = (gameState: GameState): BotActionResult | null => {
           }
           territory.currentPrice = bidResult.newPrice!;
 
-          territory.lastPaid = { red: optimalBidRed, blue: optimalBidBlue };
+          territory.lastPaid = { red: optimalBidRed, blue: optimalBidBlue, green: optimalBidGreen };
 
           logMessage = bidResult.message;
+          isBidSuccess = true;
+          bidCostObj = { red: optimalBidRed, blue: optimalBidBlue, green: optimalBidGreen };
       }
   } else {
       // Action A: Earn Money - Bot auto-selects one of the options
-      const options = earnMoneyOptions(nextState.secretValues.x, nextState.secretValues.y);
+      const options = earnMoneyOptions(nextState.secretValues.x, nextState.secretValues.y, nextState.secretValues.z);
       const chosen = options[Math.floor(Math.random() * options.length)];
       botNext.wallet.red += chosen.red;
       botNext.wallet.blue += chosen.blue;
-      logMessage = `${botNext.name} 选择了补给，获得了 ${chosen.red}红 ${chosen.blue}蓝。`;
+      botNext.wallet.green += chosen.green;
+      logMessage = `${botNext.name} 选择了补给，获得了 ${chosen.red}红 ${chosen.blue}蓝 ${chosen.green}绿。`;
   }
+
+  nextState.spyUsed = false;
 
   nextState.currentTurnIndex = (currentTurnIndex + 1) % nextState.players.length;
 
+  // Need to append the structured log message to bot's logs before returning.
+  // Actually bot logs are pushed in executor.ts, so we don't need to push here but wait, the caller pushes `botResult.actionLogMessage`.
+  // To keep structured logs for bots, we should let the caller do it, but the caller doesn't have isBid etc.
+  // Wait, I will just return an ActionLog object from bot.ts and modify executor.ts to push it properly.
+  // Ah, let's look at `executor.ts`: `nextState.logs.push({ id: Date.now().toString(), timestamp: Date.now(), message: botResult.actionLogMessage });`
+  // I need to return more info from `runBotTurn`.
   return {
     updatedGameState: nextState,
-    actionLogMessage: logMessage
-  };
+    actionLogMessage: logMessage,
+    isBid: isBidSuccess,
+    buyerId: botNext.name,
+    targetName: targetToBuy ? nextState.territories[targetToBuy].name : undefined,
+    cost: bidCostObj
+  } as any;
 };

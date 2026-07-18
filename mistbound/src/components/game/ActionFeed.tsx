@@ -3,9 +3,11 @@ import type { GameState } from '../../types/game';
 
 interface ActionFeedProps {
   logs: GameState['logs'];
+  myPlayerId: string;
+  onLogClick?: (logId: string) => void;
 }
 
-export const ActionFeed: React.FC<ActionFeedProps> = ({ logs }) => {
+export const ActionFeed: React.FC<ActionFeedProps> = ({ logs, myPlayerId, onLogClick }) => {
   return (
     <div className="h-full earth-panel rounded p-4 flex flex-col font-mono text-sm overflow-hidden">
       <h3 className="text-yellow-600 border-b border-[#5C4033] pb-2 mb-3 tracking-wider font-bold text-xs flex items-center">
@@ -15,9 +17,18 @@ export const ActionFeed: React.FC<ActionFeedProps> = ({ logs }) => {
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#5C4033]">
         {[...logs].reverse().map((log) => {
+          if (log.privateTo && log.privateTo !== myPlayerId) return null;
+
           const isEvent = log.message.includes('【');
+          const isClickable = log.isBid && log.cost && onLogClick && !log.message.includes('真实花费');
+
           return (
-          <div key={log.id} className={`break-words leading-tight p-2 rounded border-l-2 ${isEvent ? 'border-yellow-600 text-yellow-500 bg-[#3E2723]' : 'border-[#8B5A2B] text-gray-300 bg-black/40'}`}>
+          <div
+            key={log.id}
+            className={`break-words leading-tight p-2 rounded border-l-2 ${isEvent ? 'border-yellow-600 text-yellow-500 bg-[#3E2723]' : 'border-[#8B5A2B] text-gray-300 bg-black/40'} ${isClickable ? 'cursor-pointer hover:bg-[#5C4033]/50 transition-colors' : ''}`}
+            onClick={() => { if (isClickable) onLogClick(log.id); }}
+            title={isClickable ? "派间谍偷取该笔交易情报" : undefined}
+          >
             <span className="text-gray-500 text-xs mr-2">
               [{new Date(log.timestamp).toLocaleTimeString([], {hour12: false})}]
             </span>

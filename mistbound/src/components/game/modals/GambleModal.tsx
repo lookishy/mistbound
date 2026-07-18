@@ -10,6 +10,22 @@ interface GambleModalProps {
 
 export const GambleModal: React.FC<GambleModalProps> = ({ gameState, myPlayerId, onBet, onResolve }) => {
   const gamble = gameState.gambleState;
+  const gamblePhase = gamble?.phase;
+  const gambleBets = gamble?.bets;
+  const players = gameState.players;
+  const currentTurnIndex = gameState.currentTurnIndex;
+
+  // Check if all players have bet
+  useEffect(() => {
+    if (gamblePhase === 'betting' && gambleBets) {
+       const allBet = players.every(p => gambleBets[p.id] !== undefined);
+       if (allBet && players[currentTurnIndex].id === myPlayerId) {
+          // If it's my turn, trigger resolve
+          onResolve();
+       }
+    }
+  }, [gamblePhase, gambleBets, players, currentTurnIndex, myPlayerId, onResolve]);
+
   if (!gamble || !gamble.active) return null;
 
   const myPlayer = gameState.players.find(p => p.id === myPlayerId)!;
@@ -17,18 +33,6 @@ export const GambleModal: React.FC<GambleModalProps> = ({ gameState, myPlayerId,
 
   // Max bet is 2, or whatever total tokens they have
   const maxBet = Math.min(2, myPlayer.wallet.red + myPlayer.wallet.blue);
-
-
-  // Check if all players have bet
-  useEffect(() => {
-    if (gamble.phase === 'betting') {
-       const allBet = gameState.players.every(p => gamble.bets[p.id] !== undefined);
-       if (allBet && gameState.players[gameState.currentTurnIndex].id === myPlayerId) {
-          // If it's my turn, trigger resolve
-          onResolve();
-       }
-    }
-  }, [gamble.bets, gamble.phase, gameState.players]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/90">
